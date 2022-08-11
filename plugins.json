@@ -1,0 +1,42 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/Luna712/Luna712-CloudStream-Extensions/builds/DailymotionProvider.cs3",
+        "status": 0,
+        "version": 1,
+        "name": "DailymotionProvider",
+        "internalName": "DailymotionProvider",
+        "authors": [
+            "Luna712"
+        ],
+        "description": "Watch content from Dailymotion",
+        "fileSize": 11502,
+        "repositoryUrl": "https://github.com/Luna712/Luna712-CloudStream-Extensions",
+        "tvTypes": [
+            "Others"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=www.dailymotion.com&sz=%size%",
+        "apiVersion": 1,
+        "jarFileSize": 48362,
+        "jarUrl": "https://raw.githubusercontent.com/Luna712/Luna712-CloudStream-Extensions/builds/DailymotionProvider.jar"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Luna712/Luna712-CloudStream-Extensions/builds/InternetArchiveProvider.cs3",
+        "status": 1,
+        "version": 22,
+        "name": "InternetArchiveProvider",
+        "internalName": "InternetArchiveProvider",
+        "authors": [
+            "Luna712"
+        ],
+        "description": "Watch content from the Internet Archive at archive.org",
+        "fileSize": 28106,
+        "repositoryUrl": "https://github.com/Luna712/Luna712-CloudStream-Extensions",
+        "tvTypes": [
+            "Others"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=archive.org&sz=%size%",
+        "apiVersion": 1,
+        "jarFileSize": 124725,
+        "jarUrl": "https://raw.githubusercontent.com/Luna712/Luna712-CloudStream-Extensions/builds/InternetArchiveProvider.jar"
+    }
+]
