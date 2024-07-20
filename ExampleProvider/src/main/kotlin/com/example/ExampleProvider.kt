@@ -72,7 +72,7 @@ class ExampleProvider : MainAPI() {
         val identifier: String
     ) {
         suspend fun toSearchResponse(provider: ExampleProvider): SearchResponse {
-            val title = fetchTitle(identifier) // Fetch the title based on the identifier
+            val title = fetchTitle(provider, identifier) // Fetch the title based on the identifier
             return provider.newMovieSearchResponse(
                 title,
                 "${provider.mainUrl}/details/$identifier",
@@ -82,7 +82,7 @@ class ExampleProvider : MainAPI() {
             }
         }
 
-        private suspend fun fetchTitle(identifier: String): String {
+        private suspend fun fetchTitle(provider: ExampleProvider, identifier: String): String {
             return try {
                 val responseText = app.get("${provider.mainUrl}/metadata/$identifier").text
                 val videoEntry = tryParseJson<VideoEntry>(responseText)
