@@ -19,35 +19,54 @@ class ExampleProvider : MainAPI() {
     override val hasMainPage = true
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val featured = tryParseJson<List<SearchEntry>>(
-            app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier,fl[]=title&rows=20&page=$page&output=json").text
-        )
-        return newHomePageResponse(
-            listOf(
-                HomePageList(
-                    "Featured",
-                    featured?.map { it.toSearchResponse(this) } ?: emptyList(),
-                    true
-                )
-            ),
-            false
-        )
+        try {
+            val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier,fl[]=title&rows=20&page=$page&output=json").text
+            println("Response Text: $responseText") // Debugging (temp)
+            val featured = tryParseJson<SearchResult>(responseText)
+            return newHomePageResponse(
+                listOf(
+                    HomePageList(
+                        "Featured",
+                        featured?.docs?.map { it.toSearchResponse(this) } ?: emptyList(),
+                        true
+                    )
+                ),
+                false
+            )
+        } catch (e: Exception) {
+            logError(e)
+            return newHomePageResponse(emptyList(), false)
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val res = tryParseJson<List<SearchEntry>>(
-            app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}&fl[]=identifier,fl[]=title&rows=20&output=json").text
-        )
-        return res?.map { it.toSearchResponse(this) } ?: emptyList()
+        try {
+            val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}&fl[]=identifier,fl[]=title&rows=20&output=json").text
+            println("Response Text: $responseText") // Debugging (temp)
+            val res = tryParseJson<SearchResult>(responseText)
+            return res?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
+        } catch (e: Exception) {
+            logError(e)
+            return emptyList()
+        }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val identifier = url.substringAfterLast("/")
-        val res = tryParseJson<VideoEntry>(
-            app.get("$mainUrl/metadata/$identifier").text
-        )
-        return res?.toLoadResponse(this)
+        try {
+            val identifier = url.substringAfterLast("/")
+            val responseText = app.get("$mainUrl/metadata/$identifier").text
+            println("Response Text: $responseText") // Debugging (temp)
+            val res = tryParseJson<VideoEntry>(responseText)
+            return res?.toLoadResponse(this)
+        } catch (e: Exception) {
+            logError(e)
+            return null
+        }
     }
+
+    private data class SearchResult(
+        val docs: List<SearchEntry>
+    )
 
     private data class SearchEntry(
         val title: String,
@@ -104,52 +123,52 @@ class ExampleProvider : MainAPI() {
         fun String.encodeUri() = URLEncoder.encode(this, "utf8")
     }
 
-class ExampleExtractor : ExtractorApi() {
-    override val mainUrl = "https://archive.org"
-    override val requiresReferer = false
-    override val name = "Archive.org"
+    class ExampleExtractor : ExtractorApi() {
+        override val mainUrl = "https://archive.org"
+        override val requiresReferer = false
+        override val name = "Archive.org"
 
-    companion object {
-        private var archivedItems: MutableMap<String, Document> = mutableMapOf()
-    }
-
-    override fun getExtractorUrl(id: String): String {
-        return "$mainUrl/details/$id"
-    }
-
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val document = archivedItems[url] ?: run {
-            try {
-                val doc = Jsoup.connect(url).get()
-                archivedItems[url] = doc
-                doc
-            } catch (e: Exception) {
-                logError(e)
-                return
-            }
+        companion object {
+            private var archivedItems: MutableMap<String, Document> = mutableMapOf()
         }
 
-        document.select("video source").forEach {
-            val videoUrl = it.attr("src")
-            val height = it.attr("height").toIntOrNull() ?: 0
+        override fun getExtractorUrl(id: String): String {
+            return "$mainUrl/details/$id"
+        }
 
-            if (videoUrl.isNotEmpty() && height > 0) {
-                callback(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        videoUrl,
-                        "",
-                        height
+        override suspend fun getUrl(
+            url: String,
+            referer: String?,
+            subtitleCallback: (SubtitleFile) -> Unit,
+            callback: (ExtractorLink) -> Unit
+        ) {
+            val document = archivedItems[url] ?: run {
+                try {
+                    val doc = Jsoup.connect(url).get()
+                    archivedItems[url] = doc
+                    doc
+                } catch (e: Exception) {
+                    logError(e)
+                    return
+                }
+            }
+
+            document.select("video source").forEach {
+                val videoUrl = it.attr("src")
+                val height = it.attr("height").toIntOrNull() ?: 0
+
+                if (videoUrl.isNotEmpty() && height > 0) {
+                    callback(
+                        ExtractorLink(
+                            this.name,
+                            this.name,
+                            videoUrl,
+                            "",
+                            height
+                        )
                     )
-                )
+                }
             }
         }
     }
-}
 }
