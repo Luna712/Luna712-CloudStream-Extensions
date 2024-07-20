@@ -134,7 +134,6 @@ class ExampleExtractor : ExtractorApi() {
             }
         }
 
-        // Example extraction logic for video links
         document.select("video source").forEach {
             val videoUrl = it.attr("src")
             val height = it.attr("height").toIntOrNull() ?: 0
@@ -149,23 +148,6 @@ class ExampleExtractor : ExtractorApi() {
                         height
                     )
                 )
-            }
-        }
-
-        // Example extraction logic for subtitles
-        document.select("track").forEach {
-            val subtitleUrl = it.attr("src")
-            val languageTag = it.attr("srclang")
-
-            if (subtitleUrl.isNotEmpty() && languageTag.isNotEmpty()) {
-                try {
-                    val subtitleContent = Jsoup.connect(subtitleUrl).text()
-                    subtitleCallback(
-                        SubtitleFile(languageTag, subtitleContent)
-                    )
-                } catch (e: Exception) {
-                    logError(e)
-                }
             }
         }
     }
