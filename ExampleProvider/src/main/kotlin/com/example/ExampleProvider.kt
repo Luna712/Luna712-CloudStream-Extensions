@@ -20,7 +20,7 @@ class ExampleProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier,fl[]=title&rows=20&page=$page&output=json").text
-            println("Response Text: $responseText") // Debugging (temp)
+            println("Response Text: $responseText") // Debugging line
             val featured = tryParseJson<SearchResult>(responseText)
             val homePageList = featured?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
             return newHomePageResponse(
@@ -38,7 +38,7 @@ class ExampleProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}&fl[]=identifier,fl[]=title&rows=20&output=json").text
-            println("Response Text: $responseText") // Debugging (temp)
+            println("Response Text: $responseText") // Debugging line
             val res = tryParseJson<SearchResult>(responseText)
             return res?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
         } catch (e: Exception) {
@@ -51,9 +51,9 @@ class ExampleProvider : MainAPI() {
         try {
             val identifier = url.substringAfterLast("/")
             val responseText = app.get("$mainUrl/metadata/$identifier").text
-            println("Response Text: $responseText") // Debugging (temp)
-            val res = tryParseJson<VideoEntry>(responseText)
-            return res?.toLoadResponse(this)
+            println("Response Text: $responseText") // Debugging line
+            val res = tryParseJson<MetadataResult>(responseText)
+            return res?.metadata?.toLoadResponse(this)
         } catch (e: Exception) {
             logError(e)
             return null
@@ -85,14 +85,18 @@ class ExampleProvider : MainAPI() {
         private suspend fun fetchTitle(provider: ExampleProvider, identifier: String): String {
             return try {
                 val responseText = app.get("${provider.mainUrl}/metadata/$identifier").text
-                val videoEntry = tryParseJson<VideoEntry>(responseText)
-                videoEntry?.title ?: identifier
+                val metadataResult = tryParseJson<MetadataResult>(responseText)
+                metadataResult?.metadata?.title ?: identifier
             } catch (e: Exception) {
                 logError(e)
                 identifier
             }
         }
     }
+
+    private data class MetadataResult(
+        val metadata: VideoEntry
+    )
 
     private data class VideoEntry(
         val title: String,
