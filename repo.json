@@ -1,0 +1,8 @@
+{
+    "name": "Test repository",
+    "description": "Test Repository",
+    "manifestVersion": 1,
+    "pluginLists": [
+      "https://raw.githubusercontent.com/Luna712/TestPlugins/builds/plugins.json"
+    ]
+}
