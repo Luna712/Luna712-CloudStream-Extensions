@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.Qualities
 import java.net.URLEncoder
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -168,18 +169,24 @@ class ExampleProvider : MainAPI() {
                 }
             }
 
-            document.select("video source").forEach {
-                val videoUrl = it.attr("src")
-                val height = it.attr("height").toIntOrNull() ?: 0
+            document.select("a[href*=\"/download/\"]").forEach {
+                val videoUrl = it.attr("href")
+                val fileName = videoUrl.substringAfterLast('/')
+                val quality = when {
+                    fileName.contains("1080", true) -> Qualities.P1080
+                    fileName.contains("720", true) -> Qualities.P720
+                    fileName.contains("480", true) -> Qualities.P480
+                    else -> Qualities.Unknown
+                }
 
-                if (videoUrl.isNotEmpty() && height > 0) {
+                if (videoUrl.isNotEmpty()) {
                     callback(
                         ExtractorLink(
                             this.name,
                             this.name,
-                            videoUrl,
+                            mainUrl + videoUrl,
                             "",
-                            height
+                            quality
                         )
                     )
                 }
