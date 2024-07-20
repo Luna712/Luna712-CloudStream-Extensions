@@ -75,13 +75,13 @@ subprojects {
         val apk by configurations
 
         // If the task is specifically to compile the app then use the stubs, otherwise us the library.
-        if (useApk) {
+        // if (useApk) {
             // Stubs for all Cloudstream classes
             apk("com.lagradost:cloudstream3:pre-release")
-        } else {
+        //} else {
             // For running locally
-            implementation("com.github.Blatzar:CloudstreamApi:0.1.6")
-        }
+            //implementation("com.github.Blatzar:CloudstreamApi:0.1.6")
+        //}
 
         // these dependencies can include any of those which are added by the app,
         // but you dont need to include any of them if you dont need them
