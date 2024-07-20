@@ -173,10 +173,10 @@ class ExampleProvider : MainAPI() {
                 val videoUrl = it.attr("href")
                 val fileName = videoUrl.substringAfterLast('/')
                 val quality = when {
-                    fileName.contains("1080", true) -> Qualities.P1080
-                    fileName.contains("720", true) -> Qualities.P720
-                    fileName.contains("480", true) -> Qualities.P480
-                    else -> Qualities.Unknown
+                    fileName.contains("1080", true) -> Qualities.P1080.value
+                    fileName.contains("720", true) -> Qualities.P720.value
+                    fileName.contains("480", true) -> Qualities.P480.value
+                    else -> Qualities.Unknown.value
                 }
 
                 if (videoUrl.isNotEmpty()) {
