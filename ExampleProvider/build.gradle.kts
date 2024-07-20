@@ -4,14 +4,14 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.2.1")
 }
 // use an integer for version numbers
-version = 3
+version = 4
 
 
 cloudstream {
     // All of these properties are optional, you can safely remove them
 
     description = "Lorem ipsum"
-    authors = listOf("Cloudburst")
+    authors = listOf("Luna712")
 
     /**
     * Status int as the following:
@@ -20,9 +20,9 @@ cloudstream {
     * 2: Slow
     * 3: Beta only
     * */
-    status = 1
+    status = 3
 
-    tvTypes = listOf("Movie")
+    tvTypes = listOf("Other")
 
     requiresResources = true
     language = "en"
