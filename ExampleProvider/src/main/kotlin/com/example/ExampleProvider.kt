@@ -5,11 +5,8 @@ import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import java.net.URLEncoder
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 
 class ExampleProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
@@ -23,13 +20,10 @@ class ExampleProvider : MainAPI() {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier,fl[]=title&rows=20&page=$page&output=json").text
             println("Response Text: $responseText") // Debugging (temp)
             val featured = tryParseJson<SearchResult>(responseText)
+            val homePageList = featured?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
             return newHomePageResponse(
                 listOf(
-                    HomePageList(
-                        "Featured",
-                        featured?.docs?.map { it.toSearchResponse(this) } ?: emptyList(),
-                        true
-                    )
+                    HomePageList("Featured", homePageList, true)
                 ),
                 false
             )
@@ -44,7 +38,7 @@ class ExampleProvider : MainAPI() {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}&fl[]=identifier,fl[]=title&rows=20&output=json").text
             println("Response Text: $responseText") // Debugging (temp)
             val res = tryParseJson<SearchResult>(responseText)
-            return res?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
+            return res?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
         } catch (e: Exception) {
             logError(e)
             return emptyList()
@@ -65,20 +59,35 @@ class ExampleProvider : MainAPI() {
     }
 
     private data class SearchResult(
+        val response: DocsResponse
+    )
+
+    private data class DocsResponse(
         val docs: List<SearchEntry>
     )
 
     private data class SearchEntry(
-        val title: String,
         val identifier: String
     ) {
-        fun toSearchResponse(provider: ExampleProvider): SearchResponse {
+        suspend fun toSearchResponse(provider: ExampleProvider): SearchResponse {
+            val title = fetchTitle(provider, identifier) // Fetch the title based on the identifier
             return provider.newMovieSearchResponse(
                 title,
                 "${provider.mainUrl}/details/$identifier",
                 TvType.Movie
             ) {
                 this.posterUrl = "${provider.mainUrl}/services/img/$identifier"
+            }
+        }
+
+        private suspend fun fetchTitle(provider: ExampleProvider, identifier: String): String {
+            return try {
+                val responseText = provider.app.get("${provider.mainUrl}/metadata/$identifier").text
+                val videoEntry = tryParseJson<VideoEntry>(responseText)
+                videoEntry?.title ?: identifier
+            } catch (e: Exception) {
+                logError(e)
+                identifier
             }
         }
     }
