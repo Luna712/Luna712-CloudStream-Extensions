@@ -3,6 +3,6 @@
     "description": "Luna712's CloudStream Extension Repository",
     "manifestVersion": 1,
     "pluginLists": [
-      "https://raw.githubusercontent.com/Luna712/Luna712-Cloudstream-Extensions/builds/plugins.json"
+      "https://raw.githubusercontent.com/Luna712/Luna712-CloudStream-Extensions/builds/plugins.json"
     ]
 }
