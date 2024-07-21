@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.Qualities
+import java.net.URLDecoder
 import java.net.URLEncoder
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -171,24 +172,27 @@ class ExampleProvider : MainAPI() {
 
             document.select("a[href*=\"/download/\"]").forEach {
                 val videoUrl = it.attr("href")
-                val fileName = videoUrl.substringAfterLast('/')
-                val quality = when {
-                    fileName.contains("1080", true) -> Qualities.P1080.value
-                    fileName.contains("720", true) -> Qualities.P720.value
-                    fileName.contains("480", true) -> Qualities.P480.value
-                    else -> Qualities.Unknown.value
-                }
+                if (videoUrl.endsWith(".mp4", true) || videoUrl.endsWith(".mkv", true) || videoUrl.endsWith(".avi", true)) {
+                    val fileName = videoUrl.substringAfterLast('/')
+                    val fileNameCleaned = URLDecoder.decode(fileName, "UTF-8").substringBeforeLast('.')
+                    val quality = when {
+                        fileName.contains("1080", true) -> Qualities.P1080.value
+                        fileName.contains("720", true) -> Qualities.P720.value
+                        fileName.contains("480", true) -> Qualities.P480.value
+                        else -> Qualities.Unknown.value
+                    }
 
-                if (videoUrl.isNotEmpty()) {
-                    callback(
-                        ExtractorLink(
-                            this.name,
-                            fileName,
-                            mainUrl + videoUrl,
-                            "",
-                            quality
+                    if (videoUrl.isNotEmpty()) {
+                        callback(
+                            ExtractorLink(
+                                this.name,
+                                fileNameCleaned,
+                                mainUrl + videoUrl,
+                                "",
+                                quality
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
