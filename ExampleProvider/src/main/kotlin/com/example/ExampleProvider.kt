@@ -183,7 +183,7 @@ class ExampleProvider : MainAPI() {
                     callback(
                         ExtractorLink(
                             this.name,
-                            this.name,
+                            fileName,
                             mainUrl + videoUrl,
                             "",
                             quality
