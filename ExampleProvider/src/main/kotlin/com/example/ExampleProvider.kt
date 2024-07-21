@@ -7,10 +7,10 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.Qualities
-import java.net.URLDecoder
-import java.net.URLEncoder
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 class ExampleProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
@@ -101,23 +101,66 @@ class ExampleProvider : MainAPI() {
         val title: String,
         val description: String,
         val identifier: String,
-        val creator: String?
+        val creator: String?,
+        val files: List<FileMetadata>
     ) {
         suspend fun toLoadResponse(provider: ExampleProvider): LoadResponse {
-            return provider.newMovieLoadResponse(
-                title,
-                "${provider.mainUrl}/details/$identifier",
-                TvType.Movie,
-                identifier
-            ) {
-                plot = description
-                posterUrl = "${provider.mainUrl}/services/img/$identifier"
-                actors = listOfNotNull(
-                    creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
-                )
+            val uniqueFiles = files.map { it.name.removeQualityAndExtension() }.distinct()
+            val isPlaylist = uniqueFiles.size < files.size
+
+            return if (isPlaylist) {
+                val episodes = files.groupBy { it.name.removeQualityAndExtension() }.mapNotNull { (baseName, fileList) ->
+                    if (fileList.isNotEmpty()) {
+                        val firstFile = fileList.first()
+                        val fileNameCleaned = URLDecoder.decode(firstFile.name, "UTF-8").substringBeforeLast('.')
+                        val episode = "Episode\\s*(\\d+)".toRegex().find(fileNameCleaned)?.groupValues?.get(1)
+                        val season = "Season\\s*(\\d+)".toRegex().find(fileNameCleaned)?.groupValues?.get(1)
+
+                        Episode(
+                            "${provider.mainUrl}/download/${firstFile.name}",
+                            fileNameCleaned,
+                            season = season?.toIntOrNull(),
+                            episode = episode?.toIntOrNull()
+                        )
+                    } else null
+                }
+
+                provider.newTvSeriesLoadResponse(
+                    title,
+                    "${provider.mainUrl}/details/$identifier",
+                    TvType.TvSeries,
+                    episodes
+                ) {
+                    plot = description
+                    posterUrl = "${provider.mainUrl}/services/img/$identifier"
+                    actors = listOfNotNull(
+                        creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
+                    )
+                }
+            } else {
+                provider.newMovieLoadResponse(
+                    title,
+                    "${provider.mainUrl}/details/$identifier",
+                    TvType.Movie,
+                    identifier
+                ) {
+                    plot = description
+                    posterUrl = "${provider.mainUrl}/services/img/$identifier"
+                    actors = listOfNotNull(
+                        creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
+                    )
+                }
             }
         }
+
+        private fun String.removeQualityAndExtension(): String {
+            return this.replace(Regex("\\d+p"), "").substringBeforeLast('.')
+        }
     }
+
+    private data class FileMetadata(
+        val name: String
+    )
 
     override suspend fun loadLinks(
         data: String,
