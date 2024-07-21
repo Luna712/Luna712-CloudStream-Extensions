@@ -1,16 +1,29 @@
 package com.luna712
 
-import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.Actor
+import com.lagradost.cloudstream3.ActorData
+import com.lagradost.cloudstream3.HomePageList
+import com.lagradost.cloudstream3.HomePageResponse
+import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mvvm.logError
+import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.Qualities
-import java.net.URLDecoder
-import java.net.URLEncoder
+import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
@@ -20,11 +33,11 @@ class InternetArchiveProvider : MainAPI() {
     override val hasMainPage = true
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        try {
+        return try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&page=$page&output=json").text
             val featured = tryParseJson<SearchResult>(responseText)
             val homePageList = featured?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
-            return newHomePageResponse(
+            newHomePageResponse(
                 listOf(
                     HomePageList("Featured", homePageList, true)
                 ),
@@ -32,30 +45,30 @@ class InternetArchiveProvider : MainAPI() {
             )
         } catch (e: Exception) {
             logError(e)
-            return newHomePageResponse(emptyList(), false)
+            newHomePageResponse(emptyList(), false)
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        try {
+        return try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}+mediatype:(movies OR audio)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&output=json").text
             val res = tryParseJson<SearchResult>(responseText)
-            return res?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
+            res?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
         } catch (e: Exception) {
             logError(e)
-            return emptyList()
+            emptyList()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        try {
+        return try {
             val identifier = url.substringAfterLast("/")
             val responseText = app.get("$mainUrl/metadata/$identifier").text
             val res = tryParseJson<MetadataResult>(responseText)
-            return res?.metadata?.toLoadResponse(this)
+            res?.metadata?.toLoadResponse(this)
         } catch (e: Exception) {
             logError(e)
-            return null
+            null
         }
     }
 
@@ -72,7 +85,7 @@ class InternetArchiveProvider : MainAPI() {
         val mediatype: String,
         val title: String?
     ) {
-        suspend fun toSearchResponse(provider: InternetArchiveProvider): SearchResponse {
+        fun toSearchResponse(provider: InternetArchiveProvider): SearchResponse {
             val type = when (mediatype) {
                 "audio" -> TvType.Music
                 else -> TvType.Movie
@@ -133,7 +146,7 @@ class InternetArchiveProvider : MainAPI() {
     }
 
     companion object {
-        fun String.encodeUri() = URLEncoder.encode(this, "utf8")
+        fun String.encodeUri(): String = URLEncoder.encode(this, "utf8")
     }
 
     class InternetArchiveExtractor : ExtractorApi() {
