@@ -1,4 +1,4 @@
-package com.example
+package com.luna712
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.mvvm.logError
@@ -12,9 +12,9 @@ import java.net.URLEncoder
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
-class ExampleProvider : MainAPI() {
+class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
-    override var name = "Archive.org"
+    override var name = "Internet Archive"
     override val supportedTypes = setOf(TvType.Others)
     override var lang = "en"
     override val hasMainPage = true
@@ -70,7 +70,7 @@ class ExampleProvider : MainAPI() {
     private data class SearchEntry(
         val identifier: String
     ) {
-        suspend fun toSearchResponse(provider: ExampleProvider): SearchResponse {
+        suspend fun toSearchResponse(provider: InternetArchiveProvider): SearchResponse {
             val title = fetchTitle(provider, identifier) // Fetch the title based on the identifier
             return provider.newMovieSearchResponse(
                 title,
@@ -81,7 +81,7 @@ class ExampleProvider : MainAPI() {
             }
         }
 
-        private suspend fun fetchTitle(provider: ExampleProvider, identifier: String): String {
+        private suspend fun fetchTitle(provider: InternetArchiveProvider, identifier: String): String {
             return try {
                 val responseText = app.get("${provider.mainUrl}/metadata/$identifier").text
                 val metadataResult = tryParseJson<MetadataResult>(responseText)
@@ -103,7 +103,7 @@ class ExampleProvider : MainAPI() {
         val identifier: String,
         val creator: String?
     ) {
-        suspend fun toLoadResponse(provider: ExampleProvider): LoadResponse {
+        suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             return provider.newMovieLoadResponse(
                 title,
                 "${provider.mainUrl}/details/$identifier",
@@ -137,10 +137,10 @@ class ExampleProvider : MainAPI() {
         fun String.encodeUri() = URLEncoder.encode(this, "utf8")
     }
 
-    class ExampleExtractor : ExtractorApi() {
+    class InternetArchiveExtractor : ExtractorApi() {
         override val mainUrl = "https://archive.org"
         override val requiresReferer = false
-        override val name = "Archive.org"
+        override val name = "Internet Archive"
 
         companion object {
             private var archivedItems: MutableMap<String, Document> = mutableMapOf()
