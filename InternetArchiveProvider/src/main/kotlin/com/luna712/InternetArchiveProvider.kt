@@ -15,13 +15,13 @@ import org.jsoup.nodes.Document
 class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
     override var name = "Internet Archive"
-    override val supportedTypes = setOf(TvType.Others)
+    override val supportedTypes = setOf(TvType.Movie, TvType.Music)
     override var lang = "en"
     override val hasMainPage = true
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         try {
-            val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier,fl[]=title&rows=20&page=$page&output=json").text
+            val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&page=$page&output=json").text
             val featured = tryParseJson<SearchResult>(responseText)
             val homePageList = featured?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
             return newHomePageResponse(
@@ -38,7 +38,7 @@ class InternetArchiveProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         try {
-            val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}&fl[]=identifier,fl[]=title&rows=20&output=json").text
+            val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}+mediatype:(movies OR audio)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&output=json").text
             val res = tryParseJson<SearchResult>(responseText)
             return res?.response?.docs?.map { it.toSearchResponse(this) } ?: emptyList()
         } catch (e: Exception) {
@@ -68,46 +68,45 @@ class InternetArchiveProvider : MainAPI() {
     )
 
     private data class SearchEntry(
-        val identifier: String
+        val identifier: String,
+        val mediatype: String,
+        val title: String?
     ) {
         suspend fun toSearchResponse(provider: InternetArchiveProvider): SearchResponse {
-            val title = fetchTitle(provider, identifier) // Fetch the title based on the identifier
+            val type = when (mediatype) {
+                "audio" -> TvType.Music
+                else -> TvType.Movie
+            }
             return provider.newMovieSearchResponse(
-                title,
+                title ?: identifier,
                 "${provider.mainUrl}/details/$identifier",
-                TvType.Movie
+                type
             ) {
                 this.posterUrl = "${provider.mainUrl}/services/img/$identifier"
-            }
-        }
-
-        private suspend fun fetchTitle(provider: InternetArchiveProvider, identifier: String): String {
-            return try {
-                val responseText = app.get("${provider.mainUrl}/metadata/$identifier").text
-                val metadataResult = tryParseJson<MetadataResult>(responseText)
-                metadataResult?.metadata?.title ?: identifier
-            } catch (e: Exception) {
-                logError(e)
-                identifier
             }
         }
     }
 
     private data class MetadataResult(
-        val metadata: VideoEntry
+        val metadata: MediaEntry
     )
 
-    private data class VideoEntry(
-        val title: String,
-        val description: String,
+    private data class MediaEntry(
         val identifier: String,
+        val mediatype: String,
+        val title: String?,
+        val description: String?,
         val creator: String?
     ) {
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
+            val type = when (mediatype) {
+                "audio" -> TvType.Music
+                else -> TvType.Movie
+            }
             return provider.newMovieLoadResponse(
-                title,
+                title ?: identifier,
                 "${provider.mainUrl}/details/$identifier",
-                TvType.Movie,
+                type,
                 identifier
             ) {
                 plot = description
@@ -168,9 +167,9 @@ class InternetArchiveProvider : MainAPI() {
             }
 
             document.select("a[href*=\"/download/\"]").forEach {
-                val videoUrl = it.attr("href")
-                if (videoUrl.endsWith(".mp4", true) || videoUrl.endsWith(".mkv", true) || videoUrl.endsWith(".avi", true)) {
-                    val fileName = videoUrl.substringAfterLast('/')
+                val mediaUrl = it.attr("href")
+                if (mediaUrl.endsWith(".mp4", true) || mediaUrl.endsWith(".mkv", true) || mediaUrl.endsWith(".avi", true) || mediaUrl.endsWith(".mp3", true) || mediaUrl.endsWith(".flac", true)) {
+                    val fileName = mediaUrl.substringAfterLast('/')
                     val fileNameCleaned = URLDecoder.decode(fileName, "UTF-8").substringBeforeLast('.')
                     val quality = when {
                         fileName.contains("1080", true) -> Qualities.P1080.value
@@ -179,12 +178,12 @@ class InternetArchiveProvider : MainAPI() {
                         else -> Qualities.Unknown.value
                     }
 
-                    if (videoUrl.isNotEmpty()) {
+                    if (mediaUrl.isNotEmpty()) {
                         callback(
                             ExtractorLink(
                                 this.name,
                                 fileNameCleaned,
-                                mainUrl + videoUrl,
+                                mainUrl + mediaUrl,
                                 "",
                                 quality
                             )
