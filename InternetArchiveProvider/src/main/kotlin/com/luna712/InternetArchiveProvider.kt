@@ -15,7 +15,7 @@ import org.jsoup.nodes.Document
 class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
     override var name = "Internet Archive"
-    override val supportedTypes = setOf(TvType.Movie, TvType.Music)
+    override val supportedTypes = setOf(TvType.Others)
     override var lang = "en"
     override val hasMainPage = true
 
