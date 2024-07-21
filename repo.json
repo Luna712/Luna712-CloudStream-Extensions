@@ -1,6 +1,6 @@
 {
-    "name": "Test repository",
-    "description": "Test Repository",
+    "name": "Luna712's CloudStream extension repository",
+    "description": "Luna712's CloudStream Extension Repository",
     "manifestVersion": 1,
     "pluginLists": [
       "https://raw.githubusercontent.com/Luna712/TestPlugins/builds/plugins.json"
