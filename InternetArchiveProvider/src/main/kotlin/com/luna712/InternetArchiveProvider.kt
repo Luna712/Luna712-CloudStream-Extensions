@@ -149,7 +149,8 @@ class InternetArchiveProvider : MainAPI() {
                             it.format.startsWith("Matroska", true) ||
                             it.format.startsWith("DivX", true) ||
                             it.format.startsWith("Ogg Video", true) ||
-                            it.format.startsWith("DVD Info", true))
+                            it.format.startsWith("DVD Info", true) ||
+                            it.format.startsWith("ISO Image", true))
                 }.toList()
 
             val fileUrls = videoFiles.asSequence()
@@ -303,6 +304,7 @@ class InternetArchiveProvider : MainAPI() {
                         mediaUrl.endsWith(".ifo", true) ||
                         mediaUrl.endsWith(".bup", true) ||
                         mediaUrl.endsWith(".vob", true) ||
+                        mediaUrl.endsWith(".iso", true) ||
                         mediaUrl.endsWith(".mp3", true) ||
                         mediaUrl.endsWith(".wav", true) ||
                         mediaUrl.endsWith(".flac", true)
