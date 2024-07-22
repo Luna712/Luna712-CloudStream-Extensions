@@ -143,8 +143,11 @@ class InternetArchiveProvider : MainAPI() {
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
-                .filter { it.source == "original" && it.format.startsWith("MPEG4", true) }
-                .toList()
+                .filter { it.source == "original" &&
+                    (it.format.startsWith("MPEG4", true) ||
+                            it.format.startsWith("H.264", true) ||
+                            it.format.startsWith("Matroska", true))
+                }.toList()
 
             val fileUrls = videoFiles.asSequence()
                 .map { "${provider.mainUrl}$dir/${it.name}" }
