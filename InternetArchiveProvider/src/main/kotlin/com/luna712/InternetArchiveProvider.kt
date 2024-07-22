@@ -143,14 +143,16 @@ class InternetArchiveProvider : MainAPI() {
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
-                .filter { it.source == "original" &&
-                    (it.format.contains("MPEG", true) ||
-                            it.format.startsWith("H.264", true) ||
-                            it.format.startsWith("Matroska", true) ||
-                            it.format.startsWith("DivX", true) ||
-                            it.format.startsWith("Ogg Video", true) ||
-                            it.format.startsWith("DVD Info", true) ||
-                            it.format.startsWith("ISO Image", true))
+                .filter {
+                    it.source == "original" &&
+                            (it.length != null && it.length >= 10.0) &&
+                            (it.format.contains("MPEG", true) ||
+                                    it.format.startsWith("H.264", true) ||
+                                    it.format.startsWith("Matroska", true) ||
+                                    it.format.startsWith("DivX", true) ||
+                                    it.format.startsWith("Ogg Video", true) ||
+                                    it.format.startsWith("DVD Info", true) ||
+                                    it.format.startsWith("ISO Image", true))
                 }.toList()
 
             val fileUrls = videoFiles.asSequence()
@@ -179,23 +181,35 @@ class InternetArchiveProvider : MainAPI() {
                 // This may not be a TV series but we use it for video playlists as
                 // it is better for resuming (or downloading) what specific track
                 // you are on.
+                fun createKey(fileName: String): String {
+                    return fileName.substringAfterLast('/')
+                        .substringBeforeLast('.')
+                }
+
+                val urlMap = mutableMapOf<String, MutableSet<String>>()
+
+                videoFiles.forEach { file ->
+                    val key = createKey(file.name)
+                    val url = "$server$dir/${file.name}"
+                    urlMap.getOrPut(key) { mutableSetOf() }.add(url)
+                }
+
                 provider.newTvSeriesLoadResponse(
                     metadata.title ?: metadata.identifier,
                     "${provider.mainUrl}/details/${metadata.identifier}",
                     TvType.TvSeries,
-                    videoFiles.map { file ->
+                    urlMap.map { (key, urls) ->
+                        val file = videoFiles.first { createKey(it.name) == key }
                         val episodeInfo = extractEpisodeInfo(file.name)
                         Episode(
                             data = Load(
-                                url = "$server$dir/${file.name}",
+                                urls = urls,
+                                name = key.replace('_', ' '),
                                 type = "video-playlist"
                             ).toJson(),
                             season = episodeInfo.first,
                             episode = episodeInfo.second,
-                            name = file.name
-                                .substringAfterLast('/')
-                                .substringBeforeLast('.')
-                                .replace('_', ' '),
+                            name = key.replace('_', ' '),
                             posterUrl = getThumbnailUrl(file.name)
                         )
                     }
@@ -222,13 +236,15 @@ class InternetArchiveProvider : MainAPI() {
         val name: String,
         val source: String,
         val format: String,
-        val original: String?
+        val original: String?,
+        val length: Float?
     )
 
     data class Load(
-        val url: String,
+        val urls: Set<String>,
         val type: String,
-    )
+        val name: String
+        )
 
     override suspend fun loadLinks(
         data: String,
@@ -239,15 +255,27 @@ class InternetArchiveProvider : MainAPI() {
         val load = tryParseJson<Load>(data)
         // TODO if audio-playlist, use tracks
         if (load?.type == "video-playlist") {
-            callback.invoke(
-                ExtractorLink(
-                    this.name,
-                    this.name,
-                    "https://${load.url}",
-                    "",
-                    Qualities.Unknown.value,
+            fun getName(url: String): String {
+                val directory = url
+                    .substringBeforeLast("/")
+                    .substringAfterLast("/")
+                    .substringBeforeLast('.')
+                    .replace('_', ' ')
+                val extension = url.substringAfterLast(".")
+                return if (load.name != directory && load.urls.count() > 1) "$directory ($extension)" else name
+            }
+
+            load.urls.sorted().forEach { url ->
+                callback(
+                    ExtractorLink(
+                        this.name,
+                        getName(url),
+                        "https://$url",
+                        "",
+                        Qualities.Unknown.value,
+                    )
                 )
-            )
+            }
         } else {
             loadExtractor(
                 "https://archive.org/details/$data",
@@ -292,8 +320,18 @@ class InternetArchiveProvider : MainAPI() {
                 }
             }
 
-            document.select("a[href*=\"/download/\"]").forEach {
-                val mediaUrl = it.attr("href")
+            val fileLinks = document.select("a[href*=\"/download/\"]")
+
+            val select = if (fileLinks.isEmpty()) {
+                document.head().select("meta[property*=\"og:video\"]")
+            } else fileLinks
+
+            select.forEach {
+                val mediaUrl = when {
+                    it.hasAttr("href") -> mainUrl + it.attr("href")
+                    it.hasAttr("content") -> it.attr("content")
+                    else -> return@forEach
+                }
                 if (
                     mediaUrl.endsWith(".mp4", true) ||
                         mediaUrl.endsWith(".mpg", true) ||
@@ -323,7 +361,7 @@ class InternetArchiveProvider : MainAPI() {
                             ExtractorLink(
                                 this.name,
                                 fileNameCleaned,
-                                mainUrl + mediaUrl,
+                                mediaUrl,
                                 "",
                                 quality
                             )
