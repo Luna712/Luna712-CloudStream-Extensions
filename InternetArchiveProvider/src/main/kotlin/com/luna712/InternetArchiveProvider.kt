@@ -144,9 +144,13 @@ class InternetArchiveProvider : MainAPI() {
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
                 .filter { it.source == "original" &&
-                    (it.format.startsWith("MPEG4", true) ||
+                    (it.format.contains("MPEG", true) ||
                             it.format.startsWith("H.264", true) ||
-                            it.format.startsWith("Matroska", true))
+                            it.format.startsWith("Matroska", true) ||
+                            it.format.startsWith("DivX", true) ||
+                            it.format.startsWith("Ogg Video", true) ||
+                            it.format.startsWith("DVD Info", true) ||
+                            it.format.startsWith("ISO Image", true))
                 }.toList()
 
             val fileUrls = videoFiles.asSequence()
@@ -188,7 +192,10 @@ class InternetArchiveProvider : MainAPI() {
                             ).toJson(),
                             season = episodeInfo.first,
                             episode = episodeInfo.second,
-                            name = file.name.substringBeforeLast('.'),
+                            name = file.name
+                                .substringAfterLast('/')
+                                .substringBeforeLast('.')
+                                .replace('_', ' '),
                             posterUrl = getThumbnailUrl(file.name)
                         )
                     }
@@ -287,7 +294,21 @@ class InternetArchiveProvider : MainAPI() {
 
             document.select("a[href*=\"/download/\"]").forEach {
                 val mediaUrl = it.attr("href")
-                if (mediaUrl.endsWith(".mp4", true) || mediaUrl.endsWith(".mkv", true) || mediaUrl.endsWith(".avi", true) || mediaUrl.endsWith(".mp3", true) || mediaUrl.endsWith(".flac", true)) {
+                if (
+                    mediaUrl.endsWith(".mp4", true) ||
+                        mediaUrl.endsWith(".mpg", true) ||
+                        mediaUrl.endsWith(".mkv", true) ||
+                        mediaUrl.endsWith(".avi", true) ||
+                        mediaUrl.endsWith(".ogv", true) ||
+                        mediaUrl.endsWith(".ogg", true) ||
+                        mediaUrl.endsWith(".ifo", true) ||
+                        mediaUrl.endsWith(".bup", true) ||
+                        mediaUrl.endsWith(".vob", true) ||
+                        mediaUrl.endsWith(".iso", true) ||
+                        mediaUrl.endsWith(".mp3", true) ||
+                        mediaUrl.endsWith(".wav", true) ||
+                        mediaUrl.endsWith(".flac", true)
+                ) {
                     val fileName = mediaUrl.substringAfterLast('/')
                     val fileNameCleaned = URLDecoder.decode(fileName, "UTF-8").substringBeforeLast('.')
                     val quality = when {
