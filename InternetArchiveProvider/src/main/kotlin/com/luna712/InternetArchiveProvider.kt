@@ -186,35 +186,63 @@ class InternetArchiveProvider : MainAPI() {
             return thumbnail?.let { "https://${server}${dir}/${it.name}" }
         }
 
-        private fun getKey(fileName: String): String {
+        private fun getCleanedName(fileName: String): String {
             return fileName
                 .substringAfterLast('/')
                 .substringBeforeLast('.')
+                .replace('_', ' ')
         }
 
-        private fun getCleanedName(fileName: String): String {
-            return getKey(fileName).replace('_', ' ')
+        private fun getUniqueName(fileName: String): String {
+            return getCleanedName(fileName)
+                // Some files have two versions one with ".ia"
+                // and one without. In this case, we do not want
+                // treat the files as two separate files when checking
+                // for uniqueness, otherwise it will think it is a playlist
+                // when that is not the case.
+                .replace(".ia", "")
+        }
+
+        private fun timeToSeconds(time: String): Float {
+            val parts = time.split(":")
+            return when (parts.size) {
+                2 -> {
+                    val minutes = parts[0].toFloatOrNull() ?: 0f
+                    val seconds = parts[1].toFloatOrNull() ?: 0f
+                    (minutes * 60) + seconds
+                }
+                3 -> {
+                    val hours = parts[0].toFloatOrNull() ?: 0f
+                    val minutes = parts[1].toFloatOrNull() ?: 0f
+                    val seconds = parts[2].toFloatOrNull() ?: 0f
+                    (hours * 3600) + (minutes * 60) + seconds
+                }
+                else -> 0f
+            }
         }
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
                 .filter {
-                    it.source == "original" &&
-                            (it.length != null && it.length.toFloat() >= 10.0) &&
+                    val lengthInSeconds = it.length?.toFloatOrNull() ?: run {
+                        // Check if length is in a different format and convert to seconds
+                        if (it.length?.contains(":") == true) {
+                            timeToSeconds(it.length)
+                        } else 0f
+                    }
+                    lengthInSeconds >= 10.0 &&
                             (it.format.contains("MPEG", true) ||
                                     it.format.startsWith("H.264", true) ||
                                     it.format.startsWith("Matroska", true) ||
                                     it.format.startsWith("DivX", true) ||
-                                    it.format.startsWith("Ogg Video", true) ||
-                                    it.format.startsWith("DVD Info", true) ||
-                                    it.format.startsWith("ISO Image", true))
-                }.toList()
+                                    it.format.startsWith("Ogg Video", true))
+                }
 
             val type = if (metadata.mediatype == "audio") {
                 TvType.Music
             } else TvType.Movie
 
-            return if (videoFiles.count() <= 1 || type == TvType.Music) {
+            return if (videoFiles.distinctBy { getUniqueName(it.name) }.count() <= 1 || type == TvType.Music) {
                 // TODO if audio-playlist, use tracks
                 provider.newMovieLoadResponse(
                     metadata.title ?: metadata.identifier,
@@ -387,11 +415,23 @@ class InternetArchiveProvider : MainAPI() {
                 }
             }
 
-            val fileLinks = document.select("a[href*=\"/download/\"]")
+            val fileLinks = document.select("a[href*=\"/download/\"]").filter { element ->
+                val mediaUrl = element.attr("href")
 
-            val select = if (fileLinks.isEmpty()) {
-                document.head().select("meta[property*=\"og:video\"]")
-            } else fileLinks
+                mediaUrl.endsWith(".mp4", true) ||
+                        mediaUrl.endsWith(".mpg", true) ||
+                        mediaUrl.endsWith(".mkv", true) ||
+                        mediaUrl.endsWith(".avi", true) ||
+                        mediaUrl.endsWith(".ogv", true) ||
+                        mediaUrl.endsWith(".ogg", true) ||
+                        mediaUrl.endsWith(".mp3", true) ||
+                        mediaUrl.endsWith(".wav", true) ||
+                        mediaUrl.endsWith(".flac", true)
+            }
+
+            val select = fileLinks.ifEmpty {
+                document.head().select("meta[property=\"og:video\"]")
+            }
 
             select.forEach {
                 val mediaUrl = when {
@@ -399,41 +439,30 @@ class InternetArchiveProvider : MainAPI() {
                     it.hasAttr("content") -> it.attr("content")
                     else -> return@forEach
                 }
-                if (
-                    mediaUrl.endsWith(".mp4", true) ||
-                    mediaUrl.endsWith(".mpg", true) ||
-                    mediaUrl.endsWith(".mkv", true) ||
-                    mediaUrl.endsWith(".avi", true) ||
-                    mediaUrl.endsWith(".ogv", true) ||
-                    mediaUrl.endsWith(".ogg", true) ||
-                    mediaUrl.endsWith(".ifo", true) ||
-                    mediaUrl.endsWith(".bup", true) ||
-                    mediaUrl.endsWith(".vob", true) ||
-                    mediaUrl.endsWith(".iso", true) ||
-                    mediaUrl.endsWith(".mp3", true) ||
-                    mediaUrl.endsWith(".wav", true) ||
-                    mediaUrl.endsWith(".flac", true)
-                ) {
-                    val fileName = mediaUrl.substringAfterLast('/')
-                    val fileNameCleaned = fileName.decodeUri().substringBeforeLast('.')
-                    val quality = when {
-                        fileName.contains("1080", true) -> Qualities.P1080.value
-                        fileName.contains("720", true) -> Qualities.P720.value
-                        fileName.contains("480", true) -> Qualities.P480.value
-                        else -> Qualities.Unknown.value
-                    }
 
-                    if (mediaUrl.isNotEmpty()) {
-                        callback(
-                            ExtractorLink(
-                                this.name,
-                                fileNameCleaned,
-                                mediaUrl,
-                                "",
-                                quality
-                            )
+                val fileName = mediaUrl.substringAfterLast('/')
+                val quality = when {
+                    fileName.contains("1080", true) -> Qualities.P1080.value
+                    fileName.contains("720", true) -> Qualities.P720.value
+                    fileName.contains("480", true) -> Qualities.P480.value
+                    else -> Qualities.Unknown.value
+                }
+
+                if (mediaUrl.isNotEmpty()) {
+                    val name = if (mediaUrl.count() > 1) {
+                        val fileExtension = mediaUrl.substringAfterLast(".")
+                        val fileNameCleaned = fileName.decodeUri().substringBeforeLast('.')
+                        "$fileNameCleaned ($fileExtension)"
+                    } else this.name
+                    callback(
+                        ExtractorLink(
+                            this.name,
+                            name,
+                            mediaUrl,
+                            "",
+                            quality
                         )
-                    }
+                    )
                 }
             }
         }
