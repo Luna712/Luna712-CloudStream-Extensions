@@ -27,6 +27,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.util.regex.Pattern
 
 class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
@@ -134,6 +135,26 @@ class InternetArchiveProvider : MainAPI() {
             return Pair(null, null)
         }
 
+        fun extractYear(dateString: String): Int? {
+            val yearPattern = "\\b(\\d{4})\\b"
+
+            val yearRangePattern = "\\b(\\d{4})-(\\d{4})\\b"
+
+            // Check for year ranges like YYYY-YYYY
+            val yearRangeMatcher = Pattern.compile(yearRangePattern).matcher(dateString)
+            if (yearRangeMatcher.find()) {
+                return yearRangeMatcher.group(1)?.toInt()
+            }
+
+            // Check for single years in various formats
+            val yearMatcher = Pattern.compile(yearPattern).matcher(dateString)
+            if (yearMatcher.find()) {
+                return yearMatcher.group(1)?.toInt()
+            }
+
+            return null
+        }
+
         private fun getThumbnailUrl(fileName: String): String? {
             val thumbnail = files.find {
                 it.format == "Thumbnail" && it.original == fileName
@@ -145,7 +166,7 @@ class InternetArchiveProvider : MainAPI() {
             val videoFiles = files.asSequence()
                 .filter {
                     it.source == "original" &&
-                            (it.length != null && it.length >= 10.0) &&
+                            (it.length != null && it.length.toFloat() >= 10.0) &&
                             (it.format.contains("MPEG", true) ||
                                     it.format.startsWith("H.264", true) ||
                                     it.format.startsWith("Matroska", true) ||
@@ -163,6 +184,10 @@ class InternetArchiveProvider : MainAPI() {
                 TvType.Music
             } else TvType.Movie
 
+            val date = if (metadata.year != null) {
+                metadata.year.toString()
+            } else metadata.date
+
             return if (fileUrls.size <= 1 || type == TvType.Music) {
                 // TODO if audio-playlist, use tracks
                 provider.newMovieLoadResponse(
@@ -172,6 +197,9 @@ class InternetArchiveProvider : MainAPI() {
                     metadata.identifier
                 ) {
                     plot = metadata.description
+                    year = if (date?.length == 4) {
+                        date.toIntOrNull() ?: extractYear(date)
+                    } else metadata.date?.let { extractYear(it) }
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
                     actors = listOfNotNull(
                         metadata.creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
@@ -215,6 +243,9 @@ class InternetArchiveProvider : MainAPI() {
                     }
                 ) {
                     plot = metadata.description
+                    year = if (date?.length == 4) {
+                        date.toIntOrNull() ?: extractYear(date)
+                    } else metadata.date?.let { extractYear(it) }
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
                     actors = listOfNotNull(
                         metadata.creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
@@ -228,6 +259,8 @@ class InternetArchiveProvider : MainAPI() {
         val identifier: String,
         val mediatype: String,
         val title: String?,
+        val year: Int?,
+        val date: String?,
         val description: String?,
         val creator: String?
     )
@@ -237,14 +270,14 @@ class InternetArchiveProvider : MainAPI() {
         val source: String,
         val format: String,
         val original: String?,
-        val length: Float?
+        val length: String?
     )
 
     data class Load(
         val urls: Set<String>,
         val type: String,
         val name: String
-        )
+    )
 
     override suspend fun loadLinks(
         data: String,
