@@ -183,7 +183,7 @@ class InternetArchiveProvider : MainAPI() {
             val thumbnail = files.find {
                 it.format == "Thumbnail" && it.original == fileName
             }
-            return thumbnail?.let { "https://${server}${dir}/${it.name}" }
+            return thumbnail?.let { "https://$server$dir/${it.name}" }
         }
 
         private fun getCleanedName(fileName: String): String {
@@ -195,12 +195,11 @@ class InternetArchiveProvider : MainAPI() {
 
         private fun getUniqueName(fileName: String): String {
             return getCleanedName(fileName)
-                // Some files have two versions one with ".ia"
-                // and one without. In this case, we do not want
-                // treat the files as two separate files when checking
-                // for uniqueness, otherwise it will think it is a playlist
-                // when that is not the case.
-                .replace(".ia", "")
+                // Some files have versions with very similar names.
+                // In this case, we do not want treat the files as
+                // separate when checking for uniqueness, otherwise it
+                // will think it is a playlist when that is not the case.
+                .substringBeforeLast(".")
         }
 
         private fun timeToSeconds(time: String): Float {
@@ -327,7 +326,6 @@ class InternetArchiveProvider : MainAPI() {
 
     private data class MediaFile(
         val name: String,
-        val source: String,
         val format: String,
         val original: String?,
         val length: String?
