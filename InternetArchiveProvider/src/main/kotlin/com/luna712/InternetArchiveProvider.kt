@@ -186,11 +186,14 @@ class InternetArchiveProvider : MainAPI() {
             return thumbnail?.let { "https://${server}${dir}/${it.name}" }
         }
 
-        private fun getCleanedName(fileName: String): String {
+        private fun getKey(fileName: String): String {
             return fileName
                 .substringAfterLast('/')
                 .substringBeforeLast('.')
-                .replace('_', ' ')
+        }
+
+        private fun getCleanedName(fileName: String): String {
+            return getKey(fileName).replace('_', ' ')
         }
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
@@ -207,15 +210,11 @@ class InternetArchiveProvider : MainAPI() {
                                     it.format.startsWith("ISO Image", true))
                 }.toList()
 
-            val fileUrls = videoFiles.asSequence()
-                .map { "${provider.mainUrl}$dir/${it.name}" }
-                .toList()
-
             val type = if (metadata.mediatype == "audio") {
                 TvType.Music
             } else TvType.Movie
 
-            return if (fileUrls.count() <= 1 || type == TvType.Music) {
+            return if (videoFiles.count() <= 1 || type == TvType.Music) {
                 // TODO if audio-playlist, use tracks
                 provider.newMovieLoadResponse(
                     metadata.title ?: metadata.identifier,
@@ -242,28 +241,29 @@ class InternetArchiveProvider : MainAPI() {
                 val urlMap = mutableMapOf<String, MutableSet<String>>()
 
                 videoFiles.forEach { file ->
-                    val videoFileUrl = "${provider.mainUrl}$dir/${file.name}"
-                    if (urlMap.containsKey(file.name)) {
-                        urlMap[file.name]?.add(videoFileUrl)
-                    } else urlMap[file.name] = mutableSetOf(videoFileUrl)
+                    val cleanedName = getCleanedName(file.name)
+                    val videoFileUrl = "https://$server$dir/${file.name}"
+                    if (urlMap.containsKey(cleanedName)) {
+                        urlMap[cleanedName]?.add(videoFileUrl)
+                    } else urlMap[cleanedName] = mutableSetOf(videoFileUrl)
                 }
 
                 val episodes = urlMap.map { (fileName, urls) ->
-                    val cleanedName = getCleanedName(fileName)
-                    val episodeInfo = extractEpisodeInfo(fileName)
+                    val file = videoFiles.first { getCleanedName(it.name) == fileName }
+                    val episodeInfo = extractEpisodeInfo(file.name)
                     val season = episodeInfo.first
                     val episode = episodeInfo.second
 
                     Episode(
                         data = LoadData(
                             urls = urls,
-                            name = cleanedName,
+                            name = fileName,
                             type = "video-playlist"
                         ).toJson(),
-                        name = cleanedName,
+                        name = fileName,
                         season = season,
                         episode = episode,
-                        posterUrl = getThumbnailUrl(fileName)
+                        posterUrl = getThumbnailUrl(file.name)
                     )
                 }.sortedWith(compareBy({ it.season }, { it.episode }))
 
