@@ -1,8 +1,12 @@
 package com.luna712
 
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.Actor
 import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.HomePageList
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
@@ -36,6 +40,17 @@ class InternetArchiveProvider : MainAPI() {
     override var lang = "en"
     override val hasMainPage = true
 
+    private val mapper by lazy {
+        // Some metadata uses different formats. We have to handle that here.
+        jacksonObjectMapper().apply {
+            configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
+            configure(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT, true)
+            configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true)
+            configure(DeserializationFeature.ACCEPT_FLOAT_AS_INT, true)
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=mediatype:(movies)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&page=$page&output=json").text
@@ -68,11 +83,11 @@ class InternetArchiveProvider : MainAPI() {
         return try {
             val identifier = url.substringAfterLast("/")
             val responseText = app.get("$mainUrl/metadata/$identifier").text
-            val res = tryParseJson<MetadataResult>(responseText)
-            res?.toLoadResponse(this)
+            val res = mapper.readValue<MetadataResult>(responseText)
+            res.toLoadResponse(this)
         } catch (e: Exception) {
             logError(e)
-            null
+            throw ErrorLoadingException("Error loading: invalid json response")
         }
     }
 
@@ -119,7 +134,7 @@ class InternetArchiveProvider : MainAPI() {
             )
         }
 
-        fun extractEpisodeInfo(fileName: String): Pair<Int?, Int?> {
+        private fun extractEpisodeInfo(fileName: String): Pair<Int?, Int?> {
             for (pattern in seasonEpisodePatterns) {
                 val matchResult = pattern.find(fileName)
                 if (matchResult != null) {
@@ -135,18 +150,27 @@ class InternetArchiveProvider : MainAPI() {
             return Pair(null, null)
         }
 
-        fun extractYear(dateString: String): Int? {
-            val yearPattern = "\\b(\\d{4})\\b"
+        private fun extractYear(dateString: String?): Int? {
+            // If it is impossible to find a date in the given string,
+            // we can exit early
+            if (dateString == null || dateString.length < 4) return null
 
+            if (dateString.length == 4) {
+                // If the date is already a year (or it can not be one),
+                // we can exit early
+                return dateString.toIntOrNull()
+            }
+
+            val yearPattern = "\\b(\\d{4})\\b"
             val yearRangePattern = "\\b(\\d{4})-(\\d{4})\\b"
 
-            // Check for year ranges like YYYY-YYYY
+            // Check for year ranges like YYYY-YYYY and get the start year if a match is found
             val yearRangeMatcher = Pattern.compile(yearRangePattern).matcher(dateString)
             if (yearRangeMatcher.find()) {
                 return yearRangeMatcher.group(1)?.toInt()
             }
 
-            // Check for single years in various formats
+            // Check for single years within the date string in various formats
             val yearMatcher = Pattern.compile(yearPattern).matcher(dateString)
             if (yearMatcher.find()) {
                 return yearMatcher.group(1)?.toInt()
@@ -160,6 +184,13 @@ class InternetArchiveProvider : MainAPI() {
                 it.format == "Thumbnail" && it.original == fileName
             }
             return thumbnail?.let { "https://${server}${dir}/${it.name}" }
+        }
+
+        private fun getCleanedName(fileName: String): String {
+            return fileName
+                .substringAfterLast('/')
+                .substringBeforeLast('.')
+                .replace('_', ' ')
         }
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
@@ -184,11 +215,7 @@ class InternetArchiveProvider : MainAPI() {
                 TvType.Music
             } else TvType.Movie
 
-            val date = if (metadata.year != null) {
-                metadata.year.toString()
-            } else metadata.date
-
-            return if (fileUrls.size <= 1 || type == TvType.Music) {
+            return if (fileUrls.count() <= 1 || type == TvType.Music) {
                 // TODO if audio-playlist, use tracks
                 provider.newMovieLoadResponse(
                     metadata.title ?: metadata.identifier,
@@ -197,59 +224,64 @@ class InternetArchiveProvider : MainAPI() {
                     metadata.identifier
                 ) {
                     plot = metadata.description
-                    year = if (date?.length == 4) {
-                        date.toIntOrNull() ?: extractYear(date)
-                    } else metadata.date?.let { extractYear(it) }
+                    year = extractYear(metadata.date)
+                    tags = if (metadata.subject?.count() == 1) {
+                        metadata.subject[0].split(";")
+                    } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
-                    actors = listOfNotNull(
-                        metadata.creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
-                    )
+                    actors = metadata.creator?.map {
+                        ActorData(Actor(it, ""), roleString = "Creator")
+                    }
                 }
             } else {
-                // This may not be a TV series but we use it for video playlists as
-                // it is better for resuming (or downloading) what specific track
-                // you are on.
-                fun createKey(fileName: String): String {
-                    return fileName.substringAfterLast('/')
-                        .substringBeforeLast('.')
-                }
-
+                /**
+                 * This may not be a TV series but we use it for video playlists as
+                 * it is better for resuming (or downloading) what specific track
+                 * you are on.
+                 */
                 val urlMap = mutableMapOf<String, MutableSet<String>>()
 
                 videoFiles.forEach { file ->
-                    val key = createKey(file.name)
-                    val url = "$server$dir/${file.name}"
-                    urlMap.getOrPut(key) { mutableSetOf() }.add(url)
+                    val videoFileUrl = "${provider.mainUrl}$dir/${file.name}"
+                    if (urlMap.containsKey(file.name)) {
+                        urlMap[file.name]?.add(videoFileUrl)
+                    } else urlMap[file.name] = mutableSetOf(videoFileUrl)
                 }
+
+                val episodes = urlMap.map { (fileName, urls) ->
+                    val cleanedName = getCleanedName(fileName)
+                    val episodeInfo = extractEpisodeInfo(fileName)
+                    val season = episodeInfo.first
+                    val episode = episodeInfo.second
+
+                    Episode(
+                        data = LoadData(
+                            urls = urls,
+                            name = cleanedName,
+                            type = "video-playlist"
+                        ).toJson(),
+                        name = cleanedName,
+                        season = season,
+                        episode = episode,
+                        posterUrl = getThumbnailUrl(fileName)
+                    )
+                }.sortedWith(compareBy({ it.season }, { it.episode }))
 
                 provider.newTvSeriesLoadResponse(
                     metadata.title ?: metadata.identifier,
                     "${provider.mainUrl}/details/${metadata.identifier}",
                     TvType.TvSeries,
-                    urlMap.map { (key, urls) ->
-                        val file = videoFiles.first { createKey(it.name) == key }
-                        val episodeInfo = extractEpisodeInfo(file.name)
-                        Episode(
-                            data = Load(
-                                urls = urls,
-                                name = key.replace('_', ' '),
-                                type = "video-playlist"
-                            ).toJson(),
-                            season = episodeInfo.first,
-                            episode = episodeInfo.second,
-                            name = key.replace('_', ' '),
-                            posterUrl = getThumbnailUrl(file.name)
-                        )
-                    }
+                    episodes
                 ) {
                     plot = metadata.description
-                    year = if (date?.length == 4) {
-                        date.toIntOrNull() ?: extractYear(date)
-                    } else metadata.date?.let { extractYear(it) }
+                    year = extractYear(metadata.date)
+                    tags = if (metadata.subject?.count() == 1) {
+                        metadata.subject[0].split(";")
+                    } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
-                    actors = listOfNotNull(
-                        metadata.creator?.let { ActorData(Actor(it, ""), roleString = "Creator") }
-                    )
+                    actors = metadata.creator?.map {
+                        ActorData(Actor(it, ""), roleString = "Creator")
+                    }
                 }
             }
         }
@@ -259,10 +291,10 @@ class InternetArchiveProvider : MainAPI() {
         val identifier: String,
         val mediatype: String,
         val title: String?,
-        val year: Int?,
-        val date: String?,
         val description: String?,
-        val creator: String?
+        val subject: List<String>?,
+        val creator: List<String>?,
+        val date: String?
     )
 
     private data class MediaFile(
@@ -273,7 +305,7 @@ class InternetArchiveProvider : MainAPI() {
         val length: String?
     )
 
-    data class Load(
+    data class LoadData(
         val urls: Set<String>,
         val type: String,
         val name: String
@@ -285,7 +317,7 @@ class InternetArchiveProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val load = tryParseJson<Load>(data)
+        val load = tryParseJson<LoadData>(data)
         // TODO if audio-playlist, use tracks
         if (load?.type == "video-playlist") {
             fun getName(url: String): String {
@@ -303,9 +335,9 @@ class InternetArchiveProvider : MainAPI() {
                     ExtractorLink(
                         this.name,
                         getName(url),
-                        "https://$url",
+                        url,
                         "",
-                        Qualities.Unknown.value,
+                        Qualities.Unknown.value
                     )
                 )
             }
@@ -321,6 +353,8 @@ class InternetArchiveProvider : MainAPI() {
 
     companion object {
         fun String.encodeUri(): String = URLEncoder.encode(this, "utf8")
+
+        fun String.decodeUri(): String = URLDecoder.decode(this, "utf8")
     }
 
     class InternetArchiveExtractor : ExtractorApi() {
@@ -367,21 +401,21 @@ class InternetArchiveProvider : MainAPI() {
                 }
                 if (
                     mediaUrl.endsWith(".mp4", true) ||
-                        mediaUrl.endsWith(".mpg", true) ||
-                        mediaUrl.endsWith(".mkv", true) ||
-                        mediaUrl.endsWith(".avi", true) ||
-                        mediaUrl.endsWith(".ogv", true) ||
-                        mediaUrl.endsWith(".ogg", true) ||
-                        mediaUrl.endsWith(".ifo", true) ||
-                        mediaUrl.endsWith(".bup", true) ||
-                        mediaUrl.endsWith(".vob", true) ||
-                        mediaUrl.endsWith(".iso", true) ||
-                        mediaUrl.endsWith(".mp3", true) ||
-                        mediaUrl.endsWith(".wav", true) ||
-                        mediaUrl.endsWith(".flac", true)
+                    mediaUrl.endsWith(".mpg", true) ||
+                    mediaUrl.endsWith(".mkv", true) ||
+                    mediaUrl.endsWith(".avi", true) ||
+                    mediaUrl.endsWith(".ogv", true) ||
+                    mediaUrl.endsWith(".ogg", true) ||
+                    mediaUrl.endsWith(".ifo", true) ||
+                    mediaUrl.endsWith(".bup", true) ||
+                    mediaUrl.endsWith(".vob", true) ||
+                    mediaUrl.endsWith(".iso", true) ||
+                    mediaUrl.endsWith(".mp3", true) ||
+                    mediaUrl.endsWith(".wav", true) ||
+                    mediaUrl.endsWith(".flac", true)
                 ) {
                     val fileName = mediaUrl.substringAfterLast('/')
-                    val fileNameCleaned = URLDecoder.decode(fileName, "UTF-8").substringBeforeLast('.')
+                    val fileNameCleaned = fileName.decodeUri().substringBeforeLast('.')
                     val quality = when {
                         fileName.contains("1080", true) -> Qualities.P1080.value
                         fileName.contains("720", true) -> Qualities.P720.value

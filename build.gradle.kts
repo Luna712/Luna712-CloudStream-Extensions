@@ -43,7 +43,7 @@ subprojects {
     android {
         defaultConfig {
             minSdk = 21
-            compileSdkVersion(33)
+            compileSdkVersion(34)
             targetSdk = 33
         }
 
@@ -75,7 +75,8 @@ subprojects {
         // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle
         implementation(kotlin("stdlib")) // adds standard kotlin features
         implementation("com.github.Blatzar:NiceHttp:0.4.11") // http library
-        implementation("org.jsoup:jsoup:1.16.2") // html parser
+        implementation("org.jsoup:jsoup:1.17.2") // html parser
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1") // json parser
     }
 }
 
