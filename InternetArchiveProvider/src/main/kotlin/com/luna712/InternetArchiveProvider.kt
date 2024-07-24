@@ -287,7 +287,7 @@ class InternetArchiveProvider : MainAPI() {
                             name = fileName,
                             type = "video-playlist"
                         ).toJson(),
-                        name = fileName,
+                        name = file.title ?: fileName,
                         season = season,
                         episode = episode,
                         posterUrl = getThumbnailUrl(file.name)
@@ -327,6 +327,7 @@ class InternetArchiveProvider : MainAPI() {
     private data class MediaFile(
         val name: String,
         val format: String,
+        val title: String?,
         val original: String?,
         val length: String?
     )
