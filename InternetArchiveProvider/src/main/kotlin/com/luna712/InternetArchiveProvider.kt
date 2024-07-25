@@ -32,6 +32,7 @@ import org.jsoup.nodes.Document
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.regex.Pattern
+import kotlin.math.roundToInt
 
 class InternetArchiveProvider : MainAPI() {
     override var mainUrl = "https://archive.org"
@@ -125,13 +126,15 @@ class InternetArchiveProvider : MainAPI() {
         val server: String
     ) {
         companion object {
-            private val seasonEpisodePatterns = listOf(
-                Regex("S(\\d+)E(\\d+)", RegexOption.IGNORE_CASE), // S01E01
-                Regex("S(\\d+)\\s*E(\\d+)", RegexOption.IGNORE_CASE), // S01 E01
-                Regex("Season\\s*(\\d+)\\D*Episode\\s*(\\d+)", RegexOption.IGNORE_CASE), // Season 1 Episode 1
-                Regex("Episode\\s*(\\d+)\\D*Season\\s*(\\d+)", RegexOption.IGNORE_CASE), // Episode 1 Season 1
-                Regex("Episode\\s*(\\d+)", RegexOption.IGNORE_CASE) // Episode 1
-            )
+            private val seasonEpisodePatterns by lazy {
+                listOf(
+                    Regex("S(\\d+)E(\\d+)", RegexOption.IGNORE_CASE), // S01E01
+                    Regex("S(\\d+)\\s*E(\\d+)", RegexOption.IGNORE_CASE), // S01 E01
+                    Regex("Season\\s*(\\d+)\\D*Episode\\s*(\\d+)", RegexOption.IGNORE_CASE), // Season 1 Episode 1
+                    Regex("Episode\\s*(\\d+)\\D*Season\\s*(\\d+)", RegexOption.IGNORE_CASE), // Episode 1 Season 1
+                    Regex("Episode\\s*(\\d+)", RegexOption.IGNORE_CASE) // Episode 1
+                )
+            }
         }
 
         private fun extractEpisodeInfo(fileName: String): Pair<Int?, Int?> {
@@ -200,36 +203,14 @@ class InternetArchiveProvider : MainAPI() {
                 // separate when checking for uniqueness, otherwise it
                 // will think it is a playlist when that is not the case.
                 .substringBeforeLast(".")
-        }
-
-        private fun timeToSeconds(time: String): Float {
-            val parts = time.split(":")
-            return when (parts.size) {
-                2 -> {
-                    val minutes = parts[0].toFloatOrNull() ?: 0f
-                    val seconds = parts[1].toFloatOrNull() ?: 0f
-                    (minutes * 60) + seconds
-                }
-                3 -> {
-                    val hours = parts[0].toFloatOrNull() ?: 0f
-                    val minutes = parts[1].toFloatOrNull() ?: 0f
-                    val seconds = parts[2].toFloatOrNull() ?: 0f
-                    (hours * 3600) + (minutes * 60) + seconds
-                }
-                else -> 0f
-            }
+                .replace("512kb", "")
+                .trim()
         }
 
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
                 .filter {
-                    val lengthInSeconds = it.length?.toFloatOrNull() ?: run {
-                        // Check if length is in a different format and convert to seconds
-                        if (it.length?.contains(":") == true) {
-                            timeToSeconds(it.length)
-                        } else 0f
-                    }
-                    lengthInSeconds >= 10.0 &&
+                    it.lengthInSeconds >= 10.0 &&
                             (it.format.contains("MPEG", true) ||
                                     it.format.startsWith("H.264", true) ||
                                     it.format.startsWith("Matroska", true) ||
@@ -255,6 +236,7 @@ class InternetArchiveProvider : MainAPI() {
                         metadata.subject[0].split(";")
                     } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
+                    duration = (videoFiles.first().lengthInSeconds / 60).roundToInt()
                     actors = metadata.creator?.map {
                         ActorData(Actor(it, ""), roleString = "Creator")
                     }
@@ -268,7 +250,7 @@ class InternetArchiveProvider : MainAPI() {
                 val urlMap = mutableMapOf<String, MutableSet<String>>()
 
                 videoFiles.forEach { file ->
-                    val cleanedName = getCleanedName(file.name)
+                    val cleanedName = getCleanedName(file.original ?: file.name)
                     val videoFileUrl = "https://$server$dir/${file.name}"
                     if (urlMap.containsKey(cleanedName)) {
                         urlMap[cleanedName]?.add(videoFileUrl)
@@ -277,7 +259,7 @@ class InternetArchiveProvider : MainAPI() {
 
                 val episodes = urlMap.map { (fileName, urls) ->
                     val file = videoFiles.first { getCleanedName(it.name) == fileName }
-                    val episodeInfo = extractEpisodeInfo(file.name)
+                    val episodeInfo = extractEpisodeInfo(file.original ?: file.name)
                     val season = episodeInfo.first
                     val episode = episodeInfo.second
 
@@ -290,9 +272,14 @@ class InternetArchiveProvider : MainAPI() {
                         name = file.title ?: fileName,
                         season = season,
                         episode = episode,
-                        posterUrl = getThumbnailUrl(file.name)
+                        runTime = (file.lengthInSeconds / 60).roundToInt(),
+                        posterUrl = getThumbnailUrl(file.original ?: file.name)
                     )
                 }.sortedWith(compareBy({ it.season }, { it.episode }))
+
+                val maxLengthInSeconds = videoFiles
+                    .map { it.lengthInSeconds }
+                    .max()
 
                 provider.newTvSeriesLoadResponse(
                     metadata.title ?: metadata.identifier,
@@ -306,6 +293,7 @@ class InternetArchiveProvider : MainAPI() {
                         metadata.subject[0].split(";")
                     } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
+                    duration = (maxLengthInSeconds / 60).roundToInt()
                     actors = metadata.creator?.map {
                         ActorData(Actor(it, ""), roleString = "Creator")
                     }
@@ -330,7 +318,36 @@ class InternetArchiveProvider : MainAPI() {
         val title: String?,
         val original: String?,
         val length: String?
-    )
+    ) {
+        val lengthInSeconds: Float by lazy { calculateLengthInSeconds() }
+
+        private fun calculateLengthInSeconds(): Float {
+            return length?.toFloatOrNull() ?: run {
+                // Check if length is in a different format and convert to seconds
+                if (length?.contains(":") == true) {
+                    lengthToSeconds(length)
+                } else 0f
+            }
+        }
+
+        private fun lengthToSeconds(time: String): Float {
+            val parts = time.split(":")
+            return when (parts.size) {
+                2 -> {
+                    val minutes = parts[0].toFloatOrNull() ?: 0f
+                    val seconds = parts[1].toFloatOrNull() ?: 0f
+                    (minutes * 60) + seconds
+                }
+                3 -> {
+                    val hours = parts[0].toFloatOrNull() ?: 0f
+                    val minutes = parts[1].toFloatOrNull() ?: 0f
+                    val seconds = parts[2].toFloatOrNull() ?: 0f
+                    (hours * 3600) + (minutes * 60) + seconds
+                }
+                else -> 0f
+            }
+        }
+    }
 
     data class LoadData(
         val urls: Set<String>,
