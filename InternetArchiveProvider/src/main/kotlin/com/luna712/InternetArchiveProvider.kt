@@ -236,7 +236,7 @@ class InternetArchiveProvider : MainAPI() {
                         metadata.subject[0].split(";")
                     } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
-                    duration = (videoFiles.first().lengthInSeconds / 60).roundToInt()
+                    duration = ((videoFiles.firstOrNull()?.lengthInSeconds ?: 0f) / 60).roundToInt()
                     actors = metadata.creator?.map {
                         ActorData(Actor(it, ""), roleString = "Creator")
                     }
