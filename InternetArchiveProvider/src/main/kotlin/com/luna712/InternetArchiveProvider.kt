@@ -5,7 +5,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.Actor
 import com.lagradost.cloudstream3.ActorData
-import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.HomePageList
 import com.lagradost.cloudstream3.HomePageResponse
@@ -17,6 +16,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mvvm.logError
+import com.lagradost.cloudstream3.newEpisode
 import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
@@ -142,7 +142,7 @@ class InternetArchiveProvider : MainAPI() {
                 val matchResult = pattern.find(fileName)
                 if (matchResult != null) {
                     val groups = matchResult.groupValues
-                    return when (groups.size) {
+                    return when (groups.count()) {
                         3 -> Pair(groups[1].toIntOrNull(), groups[2].toIntOrNull()) // S01E01, S01 E01
                         2 -> Pair(null, groups[1].toIntOrNull()) // Episode 1
                         5 -> Pair(groups[1].toIntOrNull(), groups[3].toIntOrNull()) // Season 1 Episode 1
@@ -257,29 +257,30 @@ class InternetArchiveProvider : MainAPI() {
                     } else urlMap[cleanedName] = mutableSetOf(videoFileUrl)
                 }
 
+                val mostFrequentLengthInMinutes = videoFiles
+                    .map { (it.lengthInSeconds / 60).roundToInt() }
+                    .groupBy { it }
+                    .maxByOrNull { it.value.count() }
+                    ?.key
+
                 val episodes = urlMap.map { (fileName, urls) ->
                     val file = videoFiles.first { getCleanedName(it.name) == fileName }
                     val episodeInfo = extractEpisodeInfo(file.original ?: file.name)
-                    val season = episodeInfo.first
-                    val episode = episodeInfo.second
 
-                    Episode(
-                        data = LoadData(
+                    provider.newEpisode(
+                        LoadData(
                             urls = urls,
                             name = fileName,
                             type = "video-playlist"
-                        ).toJson(),
-                        name = file.title ?: fileName,
-                        season = season,
-                        episode = episode,
-                        runTime = (file.lengthInSeconds / 60).roundToInt(),
+                        ).toJson()
+                    ) {
+                        name = file.title ?: fileName
+                        season = episodeInfo.first
+                        episode = episodeInfo.second
+                        runTime = (file.lengthInSeconds / 60).roundToInt()
                         posterUrl = getThumbnailUrl(file.original ?: file.name)
-                    )
+                    }
                 }.sortedWith(compareBy({ it.season }, { it.episode }))
-
-                val maxLengthInSeconds = videoFiles
-                    .map { it.lengthInSeconds }
-                    .max()
 
                 provider.newTvSeriesLoadResponse(
                     metadata.title ?: metadata.identifier,
@@ -293,7 +294,7 @@ class InternetArchiveProvider : MainAPI() {
                         metadata.subject[0].split(";")
                     } else metadata.subject
                     posterUrl = "${provider.mainUrl}/services/img/${metadata.identifier}"
-                    duration = (maxLengthInSeconds / 60).roundToInt()
+                    duration = mostFrequentLengthInMinutes
                     actors = metadata.creator?.map {
                         ActorData(Actor(it, ""), roleString = "Creator")
                     }
@@ -332,7 +333,7 @@ class InternetArchiveProvider : MainAPI() {
 
         private fun lengthToSeconds(time: String): Float {
             val parts = time.split(":")
-            return when (parts.size) {
+            return when (parts.count()) {
                 2 -> {
                     val minutes = parts[0].toFloatOrNull() ?: 0f
                     val seconds = parts[1].toFloatOrNull() ?: 0f
