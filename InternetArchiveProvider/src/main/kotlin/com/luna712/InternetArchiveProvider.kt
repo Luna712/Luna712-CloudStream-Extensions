@@ -29,6 +29,8 @@ import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.select.Elements
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.regex.Pattern
@@ -182,6 +184,20 @@ class InternetArchiveProvider : MainAPI() {
             return null
         }
 
+        private fun extractQuality(height: Int?): Int {
+            return when (height) {
+                Qualities.P144.value -> Qualities.P144.value
+                Qualities.P240.value -> Qualities.P240.value
+                Qualities.P360.value -> Qualities.P360.value
+                Qualities.P480.value -> Qualities.P480.value
+                Qualities.P720.value -> Qualities.P720.value
+                Qualities.P1080.value -> Qualities.P1080.value
+                Qualities.P1440.value -> Qualities.P1440.value
+                Qualities.P2160.value -> Qualities.P2160.value
+                else -> Qualities.Unknown.value
+            }
+        }
+
         private fun getThumbnailUrl(fileName: String): String? {
             val thumbnail = files.find {
                 it.format == "Thumbnail" && it.original == fileName
@@ -207,6 +223,17 @@ class InternetArchiveProvider : MainAPI() {
                 .trim()
         }
 
+        private fun stripFontTags(html: String): String {
+            // We need to make sure descriptions use the correct text
+            // color/style of the rest of the app for consistency.
+            val document: Document = Jsoup.parse(html)
+            val fontTags: Elements = document.select("font")
+            for (fontTag: Element in fontTags) {
+                fontTag.unwrap()
+            }
+            return document.body().html()
+        }
+
         suspend fun toLoadResponse(provider: InternetArchiveProvider): LoadResponse {
             val videoFiles = files.asSequence()
                 .filter {
@@ -230,7 +257,7 @@ class InternetArchiveProvider : MainAPI() {
                     type,
                     metadata.identifier
                 ) {
-                    plot = metadata.description
+                    plot = metadata.description?.let { stripFontTags(it) }
                     year = extractYear(metadata.date)
                     tags = if (metadata.subject?.count() == 1) {
                         metadata.subject[0].split(";")
@@ -247,14 +274,29 @@ class InternetArchiveProvider : MainAPI() {
                  * it is better for resuming (or downloading) what specific track
                  * you are on.
                  */
-                val urlMap = mutableMapOf<String, MutableSet<String>>()
+                val urlMap = mutableMapOf<String, MutableSet<URLData>>()
 
                 videoFiles.forEach { file ->
                     val cleanedName = getCleanedName(file.original ?: file.name)
                     val videoFileUrl = "https://$server$dir/${file.name}"
+                    val fileQuality = extractQuality(file.height)
                     if (urlMap.containsKey(cleanedName)) {
-                        urlMap[cleanedName]?.add(videoFileUrl)
-                    } else urlMap[cleanedName] = mutableSetOf(videoFileUrl)
+                        urlMap[cleanedName]?.add(
+                            URLData(
+                                url = videoFileUrl,
+                                format = file.format,
+                                size = file.size ?: 0,
+                                quality = fileQuality
+                            )
+                        )
+                    } else urlMap[cleanedName] = mutableSetOf(
+                        URLData(
+                            url = videoFileUrl,
+                            format = file.format,
+                            size = file.size ?: 0,
+                            quality = fileQuality
+                        )
+                    )
                 }
 
                 val mostFrequentLengthInMinutes = videoFiles
@@ -263,14 +305,13 @@ class InternetArchiveProvider : MainAPI() {
                     .maxByOrNull { it.value.count() }
                     ?.key
 
-                val episodes = urlMap.map { (fileName, urls) ->
+                val episodes = urlMap.map { (fileName, urlData) ->
                     val file = videoFiles.first { getCleanedName(it.name) == fileName }
                     val episodeInfo = extractEpisodeInfo(file.original ?: file.name)
 
                     provider.newEpisode(
                         LoadData(
-                            urls = urls,
-                            name = fileName,
+                            urlData = urlData,
                             type = "video-playlist"
                         ).toJson()
                     ) {
@@ -288,7 +329,7 @@ class InternetArchiveProvider : MainAPI() {
                     TvType.TvSeries,
                     episodes
                 ) {
-                    plot = metadata.description
+                    plot = metadata.description?.let { stripFontTags(it) }
                     year = extractYear(metadata.date)
                     tags = if (metadata.subject?.count() == 1) {
                         metadata.subject[0].split(";")
@@ -318,7 +359,9 @@ class InternetArchiveProvider : MainAPI() {
         val format: String,
         val title: String?,
         val original: String?,
-        val length: String?
+        val length: String?,
+        val size: Int?,
+        val height: Int?
     ) {
         val lengthInSeconds: Float by lazy { calculateLengthInSeconds() }
 
@@ -351,9 +394,15 @@ class InternetArchiveProvider : MainAPI() {
     }
 
     data class LoadData(
-        val urls: Set<String>,
-        val type: String,
-        val name: String
+        val urlData: Set<URLData>,
+        val type: String
+    )
+
+    data class URLData(
+        val url: String,
+        val format: String,
+        val size: Int,
+        val quality: Int
     )
 
     override suspend fun loadLinks(
@@ -365,24 +414,24 @@ class InternetArchiveProvider : MainAPI() {
         val load = tryParseJson<LoadData>(data)
         // TODO if audio-playlist, use tracks
         if (load?.type == "video-playlist") {
-            fun getName(url: String): String {
-                val directory = url
-                    .substringBeforeLast("/")
-                    .substringAfterLast("/")
-                    .substringBeforeLast('.')
-                    .replace('_', ' ')
-                val extension = url.substringAfterLast(".")
-                return if (load.name != directory && load.urls.count() > 1) "$directory ($extension)" else name
+            val distinctURLData = load.urlData.filterNot {
+                it.format.endsWith("IA")
             }
 
-            load.urls.sorted().forEach { url ->
+            fun getName(format: String): String {
+                return if (distinctURLData.count() > 1) {
+                    "$name ($format)"
+                } else name
+            }
+
+            distinctURLData.sortedByDescending { it.size }.forEach { urlData: URLData ->
                 callback(
                     ExtractorLink(
                         this.name,
-                        getName(url),
-                        url,
+                        getName(urlData.format),
+                        urlData.url,
                         "",
-                        Qualities.Unknown.value
+                        urlData.quality
                     )
                 )
             }
@@ -430,6 +479,23 @@ class InternetArchiveProvider : MainAPI() {
                     logError(e)
                     return
                 }
+            }
+
+            val subtitleLinks = document.select("a[href*=\"/download/\"]").filter { element ->
+                val subtitleUrl = element.attr("href")
+                subtitleUrl.endsWith(".vtt", true) ||
+                        subtitleUrl.endsWith(".srt", true)
+            }
+
+            subtitleLinks.forEach {
+                val subtitleUrl = mainUrl + it.attr("href")
+                val fileName = subtitleUrl.substringAfterLast('/')
+                val subtitleFile = SubtitleFile(
+                    lang = fileName.substringBeforeLast(".")
+                        .substringAfterLast("."),
+                    url = subtitleUrl
+                )
+                subtitleCallback(subtitleFile)
             }
 
             val fileLinks = document.select("a[href*=\"/download/\"]").filter { element ->
