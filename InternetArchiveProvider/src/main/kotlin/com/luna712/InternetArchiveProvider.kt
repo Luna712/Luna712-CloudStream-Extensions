@@ -82,7 +82,7 @@ class InternetArchiveProvider : MainAPI() {
         }
     }
 
-    override suspend fun load(url: String): LoadResponse? {
+    override suspend fun load(url: String): LoadResponse {
         return try {
             val identifier = url.substringAfterLast("/")
             val responseText = app.get("$mainUrl/metadata/$identifier").text
@@ -223,7 +223,7 @@ class InternetArchiveProvider : MainAPI() {
                 .trim()
         }
 
-        private fun stripFontTags(html: String): String {
+        private fun cleanHtml(html: String): String {
             // We need to make sure descriptions use the correct text
             // color/style of the rest of the app for consistency.
             val document: Document = Jsoup.parse(html)
@@ -231,6 +231,14 @@ class InternetArchiveProvider : MainAPI() {
             for (fontTag: Element in fontTags) {
                 fontTag.unwrap()
             }
+
+            // Strip the last <div> tag to prevent to much padding
+            // towards the end.
+            val divTags: Elements = document.select("div")
+            if (divTags.isNotEmpty()) {
+                divTags.last()?.unwrap()
+            }
+
             return document.body().html()
         }
 
@@ -257,7 +265,7 @@ class InternetArchiveProvider : MainAPI() {
                     type,
                     metadata.identifier
                 ) {
-                    plot = metadata.description?.let { stripFontTags(it) }
+                    plot = metadata.description?.let { cleanHtml(it) }
                     year = extractYear(metadata.date)
                     tags = if (metadata.subject?.count() == 1) {
                         metadata.subject[0].split(";")
@@ -285,7 +293,7 @@ class InternetArchiveProvider : MainAPI() {
                             URLData(
                                 url = videoFileUrl,
                                 format = file.format,
-                                size = file.size ?: 0,
+                                size = file.size ?: 0f,
                                 quality = fileQuality
                             )
                         )
@@ -293,7 +301,7 @@ class InternetArchiveProvider : MainAPI() {
                         URLData(
                             url = videoFileUrl,
                             format = file.format,
-                            size = file.size ?: 0,
+                            size = file.size ?: 0f,
                             quality = fileQuality
                         )
                     )
@@ -329,7 +337,7 @@ class InternetArchiveProvider : MainAPI() {
                     TvType.TvSeries,
                     episodes
                 ) {
-                    plot = metadata.description?.let { stripFontTags(it) }
+                    plot = metadata.description?.let { cleanHtml(it) }
                     year = extractYear(metadata.date)
                     tags = if (metadata.subject?.count() == 1) {
                         metadata.subject[0].split(";")
@@ -360,7 +368,7 @@ class InternetArchiveProvider : MainAPI() {
         val title: String?,
         val original: String?,
         val length: String?,
-        val size: Int?,
+        val size: Float?,
         val height: Int?
     ) {
         val lengthInSeconds: Float by lazy { calculateLengthInSeconds() }
@@ -401,7 +409,7 @@ class InternetArchiveProvider : MainAPI() {
     data class URLData(
         val url: String,
         val format: String,
-        val size: Int,
+        val size: Float,
         val quality: Int
     )
 
