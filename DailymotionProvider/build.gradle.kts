@@ -1,3 +1,7 @@
+android {
+    namespace = "com.luna712"
+}
+
 // use an integer for version numbers
 version = 1
 
