@@ -47,6 +47,8 @@ subprojects {
             targetSdk = 35
         }
 
+        namespace = "com.luna712"
+
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_1_8
             targetCompatibility = JavaVersion.VERSION_1_8
