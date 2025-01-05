@@ -25,12 +25,12 @@ import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
-import java.net.URLEncoder
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
@@ -449,9 +449,5 @@ class InternetArchiveProvider : MainAPI() {
             )
         }
         return true
-    }
-
-    companion object {
-        fun String.encodeUri(): String = URLEncoder.encode(this, "UTF-8")
     }
 }
