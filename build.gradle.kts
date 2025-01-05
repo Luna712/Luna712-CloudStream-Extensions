@@ -1,5 +1,6 @@
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension 
 import com.android.build.gradle.BaseExtension
+import com.lagradost.cloudstream3.gradle.CloudstreamExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
     repositories {
@@ -11,8 +12,8 @@ buildscript {
 
     dependencies {
         classpath("com.android.tools.build:gradle:8.7.3")
-        // Cloudstream gradle plugin which makes everything work and builds plugins
-        classpath("com.github.recloudstream:gradle:-SNAPSHOT")
+        // CloudStream gradle plugin which makes everything work and builds plugins
+        classpath("com.github.Luna712:gradle:master-SNAPSHOT")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
     }
 }
@@ -41,8 +42,10 @@ subprojects {
     }
  
     android {
+        namespace = "com.luna712"
+
         defaultConfig {
-            minSdk = 26
+            minSdk = 21
             compileSdkVersion(35)
             targetSdk = 35
         }
@@ -52,7 +55,7 @@ subprojects {
             targetCompatibility = JavaVersion.VERSION_1_8
         }
 
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+        tasks.withType<KotlinCompile> {
             kotlinOptions {
                 jvmTarget = "1.8" // Required
                 // Disables some unnecessary features
@@ -70,13 +73,13 @@ subprojects {
 
         apk("com.lagradost:cloudstream3:pre-release")
 
-        // these dependencies can include any of those which are added by the app,
-        // but you dont need to include any of them if you dont need them
-        // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle
-        implementation(kotlin("stdlib")) // adds standard kotlin features
-        implementation("com.github.Blatzar:NiceHttp:0.4.11") // http library
-        implementation("org.jsoup:jsoup:1.17.2") // html parser
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1") // json parser
+        // These dependencies can include any of those which are added by the app,
+        // but you don't need to include any of them if you don't need them.
+        // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle.kts
+        implementation(kotlin("stdlib")) // Adds Standard Kotlin Features
+        implementation("com.github.Blatzar:NiceHttp:0.4.11") // HTTP Lib
+        implementation("org.jsoup:jsoup:1.18.3") // HTML Parser
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1") // JSON Parser
     }
 }
 
