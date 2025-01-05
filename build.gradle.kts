@@ -39,16 +39,15 @@ subprojects {
         // you can modify it to use other git hosting services, like gitlab
         setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/user/repo")
     }
-
+ 
     android {
         defaultConfig {
-            minSdk = 21
+            minSdk = 26
             compileSdkVersion(35)
             targetSdk = 35
         }
 
         compileOptions {
-            isCoreLibraryDesugaringEnabled = true
             sourceCompatibility = JavaVersion.VERSION_1_8
             targetCompatibility = JavaVersion.VERSION_1_8
         }
