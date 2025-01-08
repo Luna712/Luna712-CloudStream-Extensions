@@ -2,7 +2,7 @@
 version = 19
 
 cloudstream {
-    // All of these properties are optional, you can safely remove them.
+    // All of these properties are optional, you can safely remove any of them.
 
     description = "Watch content from the Internet Archive at archive.org"
     authors = listOf("Luna712")
