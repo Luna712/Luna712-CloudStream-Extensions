@@ -88,7 +88,7 @@ class InternetArchiveProvider : MainAPI() {
             res.toLoadResponse(this)
         } catch (e: Exception) {
             logError(e)
-            throw ErrorLoadingException("Error loading: invalid json response")
+            throw ErrorLoadingException("Error loading: Invalid JSON response")
         }
     }
 
