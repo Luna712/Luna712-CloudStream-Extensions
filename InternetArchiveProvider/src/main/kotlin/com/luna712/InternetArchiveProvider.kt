@@ -107,7 +107,7 @@ class InternetArchiveProvider : MainAPI() {
     ) {
         fun toSearchResponse(provider: InternetArchiveProvider): SearchResponse {
             val type = if (mediatype == "audio") {
-                TvType.Music
+                TvType.Audio
             } else TvType.Movie
             return provider.newMovieSearchResponse(
                 title ?: identifier,
@@ -252,10 +252,10 @@ class InternetArchiveProvider : MainAPI() {
                 }
 
             val type = if (metadata.mediatype == "audio") {
-                TvType.Music
+                TvType.Audio
             } else TvType.Movie
 
-            return if (videoFiles.distinctBy { getUniqueName(it.name) }.count() <= 1 || type == TvType.Music) {
+            return if (videoFiles.distinctBy { getUniqueName(it.name) }.count() <= 1 || type == TvType.Audio) {
                 // TODO if audio-playlist, use tracks
                 provider.newMovieLoadResponse(
                     metadata.title ?: metadata.identifier,
