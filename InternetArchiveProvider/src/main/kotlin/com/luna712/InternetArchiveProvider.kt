@@ -72,16 +72,16 @@ class InternetArchiveProvider : MainAPI() {
         }
     }
 
-    override suspend fun search(query: String, page: Int): SearchResponseList {
+    override suspend fun search(query: String, page: Int): SearchResponseList? {
         return try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}+mediatype:(movies OR audio)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&page=$page&output=json").text
             val res = tryParseJson<SearchResult>(responseText)
             res?.response?.docs?.map {
                 it.toSearchResponse(this)
-            }?.toNewSearchResponseList() ?: emptyList()
+            }?.toNewSearchResponseList()
         } catch (e: Exception) {
             logError(e)
-            emptyList()
+            null
         }
     }
 
