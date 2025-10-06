@@ -21,4 +21,6 @@ cloudstream {
     // https://recloudstream.github.io/cloudstream/html/app/com.lagradost.cloudstream3/-tv-type/index.html
     tvTypes = listOf("Others")
     iconUrl = "https://www.google.com/s2/favicons?domain=www.dailymotion.com&sz=%size%"
+
+    isCrossPlatform = true
 }
