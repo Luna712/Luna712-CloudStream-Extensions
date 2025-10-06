@@ -76,7 +76,9 @@ class InternetArchiveProvider : MainAPI() {
         return try {
             val responseText = app.get("$mainUrl/advancedsearch.php?q=${query.encodeUri()}+mediatype:(movies OR audio)&fl[]=identifier&fl[]=title&fl[]=mediatype&rows=26&page=$page&output=json").text
             val res = tryParseJson<SearchResult>(responseText)
-            res?.response?.docs?.map { it.toNewSearchResponseList(this) } ?: emptyList()
+            res?.response?.docs?.map {
+                it.toSearchResponse(this)
+            }?.toNewSearchResponseList() ?: emptyList()
         } catch (e: Exception) {
             logError(e)
             emptyList()
