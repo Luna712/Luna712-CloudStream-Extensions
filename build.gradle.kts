@@ -71,7 +71,7 @@ subprojects {
     dependencies {
         val implementation by configurations
 
-        implementation("com.github.recloudstream.cloudstream:library:master")
+        implementation("com.github.recloudstream.cloudstream:library:pre-release")
 
         // These dependencies can include any of those which are added by the app,
         // but you don't need to include any of them if you don't need them.
