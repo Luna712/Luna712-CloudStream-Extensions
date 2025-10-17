@@ -80,11 +80,11 @@ class NginxSettingsFragment(private val plugin: Plugin, val nginxApi: NginxApi) 
             view.context.resources.getString(R.string.account))
         loginView.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View?) {
-                val info = nginxApi.loginInfo()
+                val info = nginxApi.authUser()
                 if (info != null) {
-                    showLoginInfo(activity, nginxApi, info)
-                } else if (activity != null) {
-                    addAccount(activity, SyncRepo(nginxApi))
+                    showLoginInfo(activity, nginxApi, info, SyncRepo(nginxApi).accountId)
+                } else {
+                    activity?.let { addAccount(it, SyncRepo(nginxApi)) }
                 }
             }
         })
