@@ -38,6 +38,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: 17
+          distribution: adopt
           cache: gradle
 
       - name: Setup Android SDK
