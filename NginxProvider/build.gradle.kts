@@ -5,6 +5,13 @@ dependencies {
     cloudstream("com.lagradost:cloudstream3:pre-release")
 }
 
+android {
+    buildFeatures {
+        buildConfig = true
+        viewBinding = true
+    }
+}
+
 // Use an integer for version numbers
 version = 1
 
@@ -23,10 +30,13 @@ cloudstream {
      * 3: Beta only
      * */
     status = 1 // will be 3 if unspecified
+
     tvTypes = listOf(
         "AnimeMovie",
         "TvSeries",
         "Movie",
     )
+
     requiresResources = true
+    isCrossPlatform = false
 }
