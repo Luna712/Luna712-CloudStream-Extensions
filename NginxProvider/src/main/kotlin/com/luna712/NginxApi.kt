@@ -28,7 +28,7 @@ import com.lagradost.cloudstream3.syncproviders.AuthLoginRequirement
      }
 
      private fun getLatestLoginData(): AuthLoginResponse? {
-         return getKey(SyncRepo(this).accountId, NGINX_USER_KEY)
+         return getKey(SyncRepo(this).accountId.toString(), NGINX_USER_KEY)
      }
 
      override suspend fun user(token: AuthToken?): AuthUser? {
@@ -39,7 +39,7 @@ import com.lagradost.cloudstream3.syncproviders.AuthLoginRequirement
      override suspend fun login(form: AuthLoginResponse): AuthToken? {
          if (form.server.isNullOrBlank()) return null // we require a server
          // switchToNewAccount()
-         setKey(SyncRepo(this).accountId, NGINX_USER_KEY, form)
+         setKey(SyncRepo(this).accountId.toString(), NGINX_USER_KEY, form)
          // registerAccount()
          initializeData()
 
