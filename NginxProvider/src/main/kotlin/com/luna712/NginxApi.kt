@@ -3,7 +3,6 @@ package com.luna712
 import com.lagradost.cloudstream3.AcraApplication.Companion.getKey
 import com.lagradost.cloudstream3.AcraApplication.Companion.setKey
 import com.lagradost.cloudstream3.R
-import com.lagradost.cloudstream3.syncproviders.AuthAPI
 
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.syncproviders.SyncRepo
@@ -29,17 +28,17 @@ import com.lagradost.cloudstream3.syncproviders.AuthLoginRequirement
      }
 
      private fun getLatestLoginData(): AuthLoginResponse? {
-         return getKey(accountId, NGINX_USER_KEY)
+         return getKey(SyncRepo(this).accountId, NGINX_USER_KEY)
      }
 
-     override fun user(token: AuthToken?): AuthUser? {
+     override suspend fun user(token: AuthToken?): AuthUser? {
          val data = getLatestLoginData() ?: return null
          return AuthUser(name = data.username ?: data.server, id = SyncRepo(this).accountId)
      }
 
      override suspend fun login(form: AuthLoginResponse): AuthToken? {
          if (form.server.isNullOrBlank()) return null // we require a server
-         switchToNewAccount()
+         // switchToNewAccount()
          setKey(SyncRepo(this).accountId, NGINX_USER_KEY, form)
          // registerAccount()
          initializeData()
