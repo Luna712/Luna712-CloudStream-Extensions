@@ -1,11 +1,13 @@
- package com.luna712
+package com.luna712
 
- import com.lagradost.cloudstream3.AcraApplication.Companion.getKey
- import com.lagradost.cloudstream3.AcraApplication.Companion.setKey
- import com.lagradost.cloudstream3.R
- import com.lagradost.cloudstream3.syncproviders.AuthAPI
+import com.lagradost.cloudstream3.AcraApplication.Companion.getKey
+import com.lagradost.cloudstream3.AcraApplication.Companion.setKey
+import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.syncproviders.AuthAPI
 
 import com.lagradost.cloudstream3.syncproviders.SyncAPI
+import com.lagradost.cloudstream3.syncproviders.AuthLoginResponse
+import com.lagradost.cloudstream3.syncproviders.AuthToken
 import com.lagradost.cloudstream3.syncproviders.AuthLoginRequirement
 
  class NginxApi : SyncAPI() {
