@@ -292,7 +292,7 @@ class NginxProvider : MainAPI() {
                 referer = ""
                 quality = Qualities.Unknown.value
                 headers = authHeader
-
+            }
         )
         return true
     }
