@@ -14,6 +14,7 @@ import com.lagradost.cloudstream3.R
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.lagradost.cloudstream3.AcraApplication.Companion.openBrowser
 import com.lagradost.cloudstream3.plugins.Plugin
+import com.lagradost.cloudstream3.syncproviders.SyncRepo
 import com.lagradost.cloudstream3.ui.settings.SettingsAccount.Companion.showLoginInfo
 import com.lagradost.cloudstream3.ui.settings.SettingsAccount.Companion.addAccount
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
@@ -82,8 +83,8 @@ class NginxSettingsFragment(private val plugin: Plugin, val nginxApi: NginxApi) 
                 val info = nginxApi.loginInfo()
                 if (info != null) {
                     showLoginInfo(activity, nginxApi, info)
-                } else {
-                    addAccount(activity, nginxApi)
+                } else if (activity != null) {
+                    addAccount(activity, SyncRepo(nginxApi))
                 }
             }
         })
