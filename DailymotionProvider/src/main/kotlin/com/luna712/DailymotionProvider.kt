@@ -48,6 +48,7 @@ class DailymotionProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val response = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=26").text
         val popular = tryParseJson<VideoSearchResponse>(response)?.list ?: emptyList()
+        Log.d("TEST", "TEST")
 
         return newHomePageResponse(
             listOf(
@@ -110,3 +111,4 @@ class DailymotionProvider : MainAPI() {
         return true
     }
 }
+
