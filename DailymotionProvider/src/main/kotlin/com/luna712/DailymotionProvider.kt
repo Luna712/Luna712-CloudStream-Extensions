@@ -109,5 +109,3 @@ class DailymotionProvider : MainAPI() {
         return true
     }
 }
-
-
