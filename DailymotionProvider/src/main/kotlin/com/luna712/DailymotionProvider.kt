@@ -16,7 +16,6 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
-import android.util.Log
 
 class DailymotionProvider : MainAPI() {
 
@@ -48,7 +47,6 @@ class DailymotionProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val response = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=26").text
         val popular = tryParseJson<VideoSearchResponse>(response)?.list ?: emptyList()
-        Log.d("TEST", "TEST")
 
         return newHomePageResponse(
             listOf(
@@ -111,4 +109,5 @@ class DailymotionProvider : MainAPI() {
         return true
     }
 }
+
 
