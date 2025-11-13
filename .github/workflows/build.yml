@@ -39,7 +39,7 @@ jobs:
         with:
           java-version: 21
           distribution: adopt
-          # cache: gradle
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
