@@ -16,6 +16,7 @@ buildscript {
         // CloudStream gradle plugin which makes everything work and builds plugins
         classpath("com.github.Luna712:gradle:try-new-changes-SNAPSHOT")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21")
+        compileOnly("com.android.tools.build:gradle:8.13.1")
     }
 }
 
