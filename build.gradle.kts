@@ -16,7 +16,6 @@ buildscript {
         // CloudStream gradle plugin which makes everything work and builds plugins
         classpath("com.github.Luna712:gradle:try-new-changes-SNAPSHOT")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21")
-        compileOnly("com.android.tools.build:gradle:8.13.1")
     }
 }
 
@@ -71,8 +70,10 @@ subprojects {
 
     dependencies {
         val implementation by configurations
+        val compileOnly by configurations
 
         implementation("com.github.recloudstream.cloudstream:library:-SNAPSHOT")
+        compileOnly("com.android.tools.build:gradle:8.13.1")
 
         // These dependencies can include any of those which are added by the app,
         // but you don't need to include any of them if you don't need them.
