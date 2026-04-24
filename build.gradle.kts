@@ -14,7 +14,7 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.13.1")
         // CloudStream gradle plugin which makes everything work and builds plugins
-        classpath("com.github.Luna712:gradle:-SNAPSHOT")
+        classpath("com.github.Luna712:gradle:try-new-changes-SNAPSHOT")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21")
     }
 }
@@ -83,6 +83,6 @@ subprojects {
     }
 }
 
-tasks.register<Delete>("clean") {
+/* tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
-}
+} */
